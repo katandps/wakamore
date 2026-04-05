@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy::window::PresentMode;
 use bevy::winit::WinitSettings;
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
-use component::{animate_note, handle_lane_input, setup_fps, setup_judge_line, setup_note, update_fps_text, FpsHistory};
+use component::{animate_note, handle_lane_input, setup_fps, setup_judge_line, setup_note, sync_lane_ui_layout, update_fps_text, FpsHistory};
 
 fn main() {
     App::new()
@@ -12,6 +12,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 present_mode: PresentMode::AutoNoVsync,
+                resolution: (1920, 1080).into(),
                 ..default()
             }),
             ..default()
@@ -20,7 +21,7 @@ fn main() {
         .init_resource::<FpsHistory>()
         .add_systems(Startup, setup)
         .add_systems(Startup, setup_judge_line)
-        .add_systems(Update, (update_fps_text, handle_lane_input, animate_note))
+        .add_systems(Update, (sync_lane_ui_layout, update_fps_text, handle_lane_input, animate_note))
         .run();
 }
 
