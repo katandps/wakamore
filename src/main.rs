@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy::window::PresentMode;
 use bevy::winit::WinitSettings;
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
-use component::{animate_note, setup_fps, setup_judge_line, setup_note, update_fps_text, FpsHistory};
+use component::{animate_note, handle_lane_input, setup_fps, setup_judge_line, setup_note, update_fps_text, FpsHistory};
 
 fn main() {
     App::new()
@@ -20,7 +20,7 @@ fn main() {
         .init_resource::<FpsHistory>()
         .add_systems(Startup, setup)
         .add_systems(Startup, setup_judge_line)
-        .add_systems(Update, (update_fps_text, animate_note))
+        .add_systems(Update, (update_fps_text, handle_lane_input, animate_note))
         .run();
 }
 
