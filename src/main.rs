@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy::window::PresentMode;
 use bevy::winit::WinitSettings;
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
-use component::{setup_fps, update_fps_text, FpsHistory};
+use component::{animate_note, setup_fps, setup_judge_line, setup_note, update_fps_text, FpsHistory};
 
 fn main() {
     App::new()
@@ -19,11 +19,13 @@ fn main() {
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .init_resource::<FpsHistory>()
         .add_systems(Startup, setup)
-        .add_systems(Update, update_fps_text)
+        .add_systems(Startup, setup_judge_line)
+        .add_systems(Update, (update_fps_text, animate_note))
         .run();
 }
 
 fn setup(mut commands: Commands) {
     commands.spawn(Camera2d::default());
-    setup_fps(commands);
+    setup_fps(&mut commands);
+    setup_note(&mut commands);
 }

@@ -9,7 +9,7 @@ pub struct FpsHistory {
     pub samples: Vec<(f64, f64)>,
 }
 
-pub fn setup_fps(mut commands: Commands) {
+pub fn setup_fps(commands: &mut Commands) {
     commands.spawn((
         Text::new("FPS: 0"),
         TextFont {
