@@ -9,10 +9,12 @@ use bevy::prelude::*;
 use bevy::window::PresentMode;
 use bevy::winit::WinitSettings;
 use component::{
-    FpsHistory, GameplayEntity, LaneInputEvent, LaneInputState, LaneJudgementEvent, ScoreSummary,
+    FpsHistory, GameplayEntity, LaneInputEvent, LaneInputState, LaneJudgementEvent, NoteChart,
+    ScoreSummary,
     animate_note, apply_judgement_display, apply_lane_input_visuals, collect_lane_input_state,
-    emit_lane_input_events, evaluate_lane_judgement, reset_score_summary, setup_fps,
-    setup_judge_line, setup_note, sync_lane_ui_layout, update_fps_text,
+    emit_lane_input_events, evaluate_lane_judgement, generate_random_chart, reset_score_summary,
+    reset_playback, spawn_notes_from_chart,
+    setup_fps, setup_judge_line, setup_note, sync_lane_ui_layout, update_fps_text,
 };
 
 #[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default)]
@@ -44,6 +46,8 @@ fn main() {
         .init_state::<AppState>()
         .init_resource::<FpsHistory>()
         .init_resource::<LaneInputState>()
+        .init_resource::<component::ChartPlayback>()
+        .insert_resource(NoteChart::demo())
         .init_resource::<ScoreSummary>()
         .add_message::<LaneInputEvent>()
         .add_message::<LaneJudgementEvent>()
@@ -53,7 +57,14 @@ fn main() {
         .add_systems(OnExit(AppState::Title), cleanup_title)
         .add_systems(
             OnEnter(AppState::Playing),
-            (reset_score_summary, setup_note, setup_judge_line),
+            (
+                generate_random_chart,
+                reset_score_summary,
+                reset_playback,
+                setup_note,
+                setup_judge_line,
+            )
+                .chain(),
         )
         .add_systems(
             Update,
@@ -64,6 +75,7 @@ fn main() {
                 evaluate_lane_judgement,
                 apply_judgement_display,
                 animate_note,
+                spawn_notes_from_chart,
                 sync_lane_ui_layout,
             )
                 .chain()

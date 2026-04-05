@@ -1,21 +1,17 @@
 pub mod fps;
 pub mod note;
 
-pub use fps::{setup_fps, update_fps_text, FpsHistory};
+pub use fps::{FpsHistory, setup_fps, update_fps_text};
 pub use note::GameplayEntity;
 
 pub use crate::entity::note::{setup_judge_line, setup_note};
 pub use crate::event::note::{LaneInputEvent, LaneJudgementEvent};
-pub use crate::resource::note::{LaneInputState, ScoreSummary};
+pub use crate::resource::note::{Lane, LaneInputState, NoteChart, ScoreSummary};
+
 pub use crate::system::note::{
-    animate_note,
-    apply_judgement_display,
-    apply_lane_input_visuals,
-    collect_lane_input_state,
-    emit_lane_input_events,
-    evaluate_lane_judgement,
-    reset_score_summary,
-    sync_lane_ui_layout,
+    animate_note, apply_judgement_display, apply_lane_input_visuals, collect_lane_input_state,
+    emit_lane_input_events, evaluate_lane_judgement, generate_random_chart, reset_score_summary,
+    sync_lane_ui_layout, reset_playback, spawn_notes_from_chart, ChartPlayback,
 };
 
 pub const LANE_COUNT: usize = 8;

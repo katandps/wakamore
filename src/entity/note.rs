@@ -10,25 +10,7 @@ use crate::component::{
 
 pub fn setup_note(mut commands: Commands) {
     let lanes = lane_specs();
-
-    let total_width = lanes.iter().map(|lane| lane.width).sum::<f32>()
-        + LANE_GAP * (lanes.len().saturating_sub(1) as f32);
-    let mut left = -total_width * 0.5;
-
-    for (lane_index, lane) in lanes.into_iter().enumerate() {
-        let x = left + lane.width * 0.5;
-        commands.spawn((
-            Sprite::from_color(lane.color, Vec2::new(lane.width, NOTE_HEIGHT)),
-            Transform::from_xyz(x, 0.0, 0.0),
-            Note {
-                lane_index,
-                initialized: false,
-                respawn_delay_remaining: 0.0,
-            },
-            GameplayEntity,
-        ));
-        left += lane.width + LANE_GAP;
-    }
+    // No static notes are spawned here. Notes are spawned dynamically from `NoteChart`.
 }
 
 pub fn setup_judge_line(mut commands: Commands, window_q: Query<&Window, With<PrimaryWindow>>) {
