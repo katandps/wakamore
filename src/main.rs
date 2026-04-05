@@ -1,21 +1,18 @@
 mod component;
+mod entity;
+mod event;
+mod resource;
+mod system;
 
+use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
 use bevy::window::PresentMode;
 use bevy::winit::WinitSettings;
-use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use component::{
-    animate_note,
-    handle_lane_input,
-    reset_score_summary,
-    setup_fps,
-    setup_judge_line,
-    setup_note,
-    sync_lane_ui_layout,
-    update_fps_text,
-    FpsHistory,
-    GameplayEntity,
-    ScoreSummary,
+    FpsHistory, GameplayEntity, LaneInputEvent, LaneInputState, LaneJudgementEvent, ScoreSummary,
+    animate_note, apply_judgement_display, apply_lane_input_visuals, collect_lane_input_state,
+    emit_lane_input_events, evaluate_lane_judgement, reset_score_summary, setup_fps,
+    setup_judge_line, setup_note, sync_lane_ui_layout, update_fps_text,
 };
 
 #[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default)]
@@ -46,18 +43,43 @@ fn main() {
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .init_state::<AppState>()
         .init_resource::<FpsHistory>()
+        .init_resource::<LaneInputState>()
         .init_resource::<ScoreSummary>()
+        .add_message::<LaneInputEvent>()
+        .add_message::<LaneJudgementEvent>()
         .add_systems(Startup, (setup_camera, setup_fps))
         .add_systems(OnEnter(AppState::Title), setup_title)
         .add_systems(Update, update_title_input.run_if(in_state(AppState::Title)))
         .add_systems(OnExit(AppState::Title), cleanup_title)
-        .add_systems(OnEnter(AppState::Playing), (reset_score_summary, setup_note, setup_judge_line))
-        .add_systems(Update, (sync_lane_ui_layout, handle_lane_input, animate_note).run_if(in_state(AppState::Playing)))
+        .add_systems(
+            OnEnter(AppState::Playing),
+            (reset_score_summary, setup_note, setup_judge_line),
+        )
+        .add_systems(
+            Update,
+            (
+                collect_lane_input_state,
+                emit_lane_input_events,
+                apply_lane_input_visuals,
+                evaluate_lane_judgement,
+                apply_judgement_display,
+                animate_note,
+                sync_lane_ui_layout,
+            )
+                .chain()
+                .run_if(in_state(AppState::Playing)),
+        )
         .add_systems(Update, update_fps_text)
-        .add_systems(Update, update_playing_input.run_if(in_state(AppState::Playing)))
+        .add_systems(
+            Update,
+            update_playing_input.run_if(in_state(AppState::Playing)),
+        )
         .add_systems(OnExit(AppState::Playing), cleanup_playing)
         .add_systems(OnEnter(AppState::Result), setup_result)
-        .add_systems(Update, update_result_input.run_if(in_state(AppState::Result)))
+        .add_systems(
+            Update,
+            update_result_input.run_if(in_state(AppState::Result)),
+        )
         .add_systems(OnExit(AppState::Result), cleanup_result)
         .run();
 }
@@ -84,13 +106,19 @@ fn setup_title(mut commands: Commands) {
     ));
 }
 
-fn update_title_input(keys: Res<ButtonInput<KeyCode>>, mut next_state: ResMut<NextState<AppState>>) {
+fn update_title_input(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
     if keys.just_pressed(KeyCode::Enter) {
         next_state.set(AppState::Playing);
     }
 }
 
-fn update_playing_input(keys: Res<ButtonInput<KeyCode>>, mut next_state: ResMut<NextState<AppState>>) {
+fn update_playing_input(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
     if keys.just_pressed(KeyCode::KeyR) {
         next_state.set(AppState::Result);
         return;
@@ -122,7 +150,10 @@ fn setup_result(mut commands: Commands, score_summary: Res<ScoreSummary>) {
     ));
 }
 
-fn update_result_input(keys: Res<ButtonInput<KeyCode>>, mut next_state: ResMut<NextState<AppState>>) {
+fn update_result_input(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
     if keys.just_pressed(KeyCode::Enter) {
         next_state.set(AppState::Title);
         return;
