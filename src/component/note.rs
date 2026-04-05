@@ -18,8 +18,18 @@ const JUDGEMENT_TEXT_Y_FROM_BOTTOM: f32 = KEY_INDICATOR_Y_FROM_BOTTOM - 24.0;
 const JUDGEMENT_DISPLAY_SECONDS: f32 = 0.18;
 const PG_WINDOW_MS: f32 = 20.0;
 const GR_WINDOW_MS: f32 = 40.0;
+const SCORE_PG: u32 = 1000;
+const SCORE_GR: u32 = 500;
 const LANE_TOTAL_WIDTH: f32 =
     WHITE_NOTE_WIDTH * 4.0 + BLUE_NOTE_WIDTH * 3.0 + RED_NOTE_WIDTH + LANE_GAP * 7.0;
+
+#[derive(Resource, Default)]
+pub struct ScoreSummary {
+    pub pg: u32,
+    pub gr: u32,
+    pub miss: u32,
+    pub score: u32,
+}
 
 #[derive(Component)]
 pub struct Note {
@@ -27,6 +37,9 @@ pub struct Note {
     initialized: bool,
     respawn_delay_remaining: f32,
 }
+
+#[derive(Component)]
+pub struct GameplayEntity;
 
 #[derive(Component)]
 pub struct LaneKeyIndicator {
@@ -99,7 +112,7 @@ fn lane_specs() -> [LaneSpec; 8] {
     ]
 }
 
-pub fn setup_note(commands: &mut Commands) {
+pub fn setup_note(mut commands: Commands) {
     let lanes = lane_specs();
 
     let total_width = lanes.iter().map(|lane| lane.width).sum::<f32>()
@@ -116,6 +129,7 @@ pub fn setup_note(commands: &mut Commands) {
                 initialized: false,
                 respawn_delay_remaining: 0.0,
             },
+            GameplayEntity,
         ));
         left += lane.width + LANE_GAP;
     }
@@ -153,6 +167,7 @@ pub fn handle_lane_input(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
     window_q: Query<&Window, With<PrimaryWindow>>,
+    mut score_summary: ResMut<ScoreSummary>,
     mut indicator_q: Query<(&LaneKeyIndicator, &mut BackgroundColor)>,
     note_q: Query<(&Note, &Transform)>,
     mut judge_text_q: Query<(&mut LaneJudgeText, &mut Text, &mut TextColor)>,
@@ -205,12 +220,22 @@ pub fn handle_lane_input(
             text.0 = "PG".to_string();
             text_color.0 = Color::srgb(1.0, 0.92, 0.35);
             judge_text.remaining_secs = JUDGEMENT_DISPLAY_SECONDS;
+            score_summary.pg += 1;
+            score_summary.score += SCORE_PG;
         } else if delta_ms <= GR_WINDOW_MS {
             text.0 = "GR".to_string();
             text_color.0 = Color::srgb(0.45, 0.95, 0.45);
             judge_text.remaining_secs = JUDGEMENT_DISPLAY_SECONDS;
+            score_summary.gr += 1;
+            score_summary.score += SCORE_GR;
+        } else {
+            score_summary.miss += 1;
         }
     }
+}
+
+pub fn reset_score_summary(mut score_summary: ResMut<ScoreSummary>) {
+    *score_summary = ScoreSummary::default();
 }
 
 pub fn setup_judge_line(mut commands: Commands, window_q: Query<&Window, With<PrimaryWindow>>) {
@@ -229,6 +254,7 @@ pub fn setup_judge_line(mut commands: Commands, window_q: Query<&Window, With<Pr
         ),
         Transform::from_xyz(0.0, y, 1.0),
         JudgeLine,
+        GameplayEntity,
     ));
 
     for (lane_index, lane) in lanes.into_iter().enumerate() {
@@ -246,6 +272,7 @@ pub fn setup_judge_line(mut commands: Commands, window_q: Query<&Window, With<Pr
             },
             BackgroundColor(Color::srgb(0.22, 0.24, 0.28)),
             LaneKeyIndicator { index: lane_index },
+            GameplayEntity,
         ));
 
         commands.spawn((
@@ -266,6 +293,7 @@ pub fn setup_judge_line(mut commands: Commands, window_q: Query<&Window, With<Pr
                 index: lane_index,
                 remaining_secs: 0.0,
             },
+            GameplayEntity,
         ));
 
         left += lane.width + LANE_GAP;
