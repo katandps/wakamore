@@ -16,11 +16,11 @@ use state::{
     AppState, cleanup_playing, cleanup_result, cleanup_title, setup_result, setup_title,
     update_playing_input, update_result_input, update_title_input,
 };
-use system::note::{
-    animate_note, apply_judgement_display, apply_lane_input_visuals, collect_lane_input_state,
-    emit_lane_input_events, evaluate_lane_judgement, generate_random_chart, reset_playback,
-    reset_score_summary, spawn_notes_from_chart, sync_lane_ui_layout,
-};
+use system::note_spawn::{generate_random_chart, reset_playback, reset_score_summary, spawn_notes_from_chart};
+use system::note_input::{collect_lane_input_state, emit_lane_input_events, apply_lane_input_visuals};
+use system::note_judge::{evaluate_lane_judgement, apply_judgement_display};
+use system::note_ui::sync_lane_ui_layout;
+use system::note_animate::animate_note;
 
 fn main() {
     App::new()

@@ -5,7 +5,7 @@ pub use note::GameplayEntity;
 
 pub use crate::resource::note::ScoreSummary;
 
-pub use crate::system::note::ChartPlayback;
+pub use crate::system::note_spawn::ChartPlayback;
 
 pub const LANE_COUNT: usize = 8;
 pub const WHITE_NOTE_WIDTH: f32 = 60.0;
