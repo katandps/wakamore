@@ -4,6 +4,8 @@ mod event;
 mod resource;
 mod state;
 mod system;
+use input::poll_key_events;
+use emitter::{emit_gamepad_button_lane_input, input_events_to_lane_events};
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
 use bevy::window::PresentMode;
@@ -17,7 +19,7 @@ use state::{
     update_playing_input, update_result_input, update_title_input,
 };
 use system::note_spawn::{generate_random_chart, reset_playback, reset_score_summary, spawn_notes_from_chart};
-use system::note_input::{collect_lane_input_state, emit_lane_input_events, apply_lane_input_visuals};
+use system::note_input::apply_lane_input_visuals;
 use system::note_judge::{evaluate_lane_judgement, apply_judgement_display};
 use system::note_ui::sync_lane_ui_layout;
 use system::note_animate::animate_note;
@@ -41,6 +43,7 @@ fn main() {
         .insert_resource(NoteChart::demo())
         .init_resource::<ScoreSummary>()
         .add_message::<LaneInputEvent>()
+        .add_message::<common::InputEvent>()
         .add_message::<LaneJudgementEvent>()
         .add_systems(Startup, (setup_camera, setup_fps))
         .add_systems(OnEnter(AppState::Title), setup_title)
@@ -60,8 +63,9 @@ fn main() {
         .add_systems(
             Update,
             (
-                collect_lane_input_state,
-                emit_lane_input_events,
+                poll_key_events,
+                emit_gamepad_button_lane_input,
+                input_events_to_lane_events,
                 apply_lane_input_visuals,
                 evaluate_lane_judgement,
                 apply_judgement_display,

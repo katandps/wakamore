@@ -1882,6 +1882,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2254,6 +2261,14 @@ name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
+
+[[package]]
+name = "emitter"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "common",
+]
 
 [[package]]
 name = "encase"
@@ -2914,6 +2929,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e05c02b5e89bff3b946cedeca278abc628fe811e604f027c45a8aa3cf793d0eb"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "input"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "common",
 ]
 
 [[package]]
@@ -4951,6 +4974,9 @@ name = "wakamore"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "common",
+ "emitter",
+ "input",
  "rand 0.8.5",
 ]
 

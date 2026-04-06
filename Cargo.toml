@@ -6,6 +6,9 @@ edition = "2024"
 [dependencies]
 bevy = "0.18.1"
 rand = "0.8.5"
+common = { path = "common" }
+input = { path = "input" }
+emitter = { path = "emitter" }
 
 [profile.dev]
 
@@ -13,3 +16,6 @@ rand = "0.8.5"
 opt-level = 3
 lto = true
 codegen-units = 1
+
+[workspace]
+members = ["common", "input", "emitter", "."]

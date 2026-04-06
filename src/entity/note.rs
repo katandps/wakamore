@@ -7,8 +7,8 @@ use crate::component::{
     KEY_INDICATOR_DIAMETER, KEY_INDICATOR_Y_FROM_BOTTOM, LANE_GAP, LANE_TOTAL_WIDTH, lane_specs,
 };
 
-pub fn setup_note(mut commands: Commands) {
-    let lanes = lane_specs();
+pub fn setup_note(_commands: Commands) {
+    let _lanes = lane_specs();
     // No static notes are spawned here. Notes are spawned dynamically from `NoteChart`.
 }
 
