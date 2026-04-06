@@ -1,11 +1,10 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use crate::component::note::{GameplayEntity, JudgeLine, LaneJudgeText, LaneKeyIndicator, Note};
+use crate::component::note::{GameplayEntity, JudgeLine, LaneJudgeText, LaneKeyIndicator};
 use crate::component::{
     JUDGE_LINE_THICKNESS, JUDGE_LINE_Y_FROM_BOTTOM, JUDGEMENT_TEXT_Y_FROM_BOTTOM,
-    KEY_INDICATOR_DIAMETER, KEY_INDICATOR_Y_FROM_BOTTOM, LANE_GAP, LANE_TOTAL_WIDTH, NOTE_HEIGHT,
-    lane_specs,
+    KEY_INDICATOR_DIAMETER, KEY_INDICATOR_Y_FROM_BOTTOM, LANE_GAP, LANE_TOTAL_WIDTH, lane_specs,
 };
 
 pub fn setup_note(mut commands: Commands) {
