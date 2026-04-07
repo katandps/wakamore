@@ -4,25 +4,30 @@ mod event;
 mod resource;
 mod state;
 mod system;
-use input::poll_key_events;
-use emitter::{emit_gamepad_button_lane_input, input_events_to_lane_events};
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
 use bevy::window::PresentMode;
 use bevy::winit::WinitSettings;
 use component::fps::{FpsHistory, setup_fps, update_fps_text};
+use emitter::{
+    emit_gamepad_button_lane_input, input_events_to_lane_events, record_lane_raw_events,
+};
 use entity::note::{setup_judge_line, setup_note};
 use event::note::{LaneInputEvent, LaneJudgementEvent};
+use input::poll_key_events;
 use resource::note::{LaneInputState, NoteChart, ScoreSummary};
 use state::{
     AppState, cleanup_playing, cleanup_result, cleanup_title, setup_result, setup_title,
     update_playing_input, update_result_input, update_title_input,
 };
-use system::note_spawn::{generate_random_chart, reset_playback, reset_score_summary, spawn_notes_from_chart};
-use system::note_input::apply_lane_input_visuals;
-use system::note_judge::{evaluate_lane_judgement, apply_judgement_display};
-use system::note_ui::sync_lane_ui_layout;
+use system::input_log::record_judgement_to_log;
 use system::note_animate::animate_note;
+use system::note_input::apply_lane_input_visuals;
+use system::note_judge::{apply_judgement_display, evaluate_lane_judgement};
+use system::note_spawn::{
+    generate_random_chart, reset_playback, reset_score_summary, spawn_notes_from_chart,
+};
+use system::note_ui::sync_lane_ui_layout;
 
 fn main() {
     App::new()
@@ -39,6 +44,8 @@ fn main() {
         .init_state::<AppState>()
         .init_resource::<FpsHistory>()
         .init_resource::<LaneInputState>()
+        .init_resource::<common::InputLog>()
+        .init_resource::<common::LastRawByLane>()
         .init_resource::<component::ChartPlayback>()
         .insert_resource(NoteChart::demo())
         .init_resource::<ScoreSummary>()
@@ -66,8 +73,10 @@ fn main() {
                 poll_key_events,
                 emit_gamepad_button_lane_input,
                 input_events_to_lane_events,
+                record_lane_raw_events,
                 apply_lane_input_visuals,
                 evaluate_lane_judgement,
+                record_judgement_to_log,
                 apply_judgement_display,
                 animate_note,
                 spawn_notes_from_chart,

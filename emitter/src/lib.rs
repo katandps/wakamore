@@ -1,7 +1,7 @@
 //! emitter: adapters that turn `InputEvent` into runtime events.
 
 use bevy::prelude::*;
-use common::{InputEvent, LaneInputEvent};
+use common::{InputEvent, LaneInputEvent, LastRawByLane, RawInput};
 fn keycode_to_lane(key: KeyCode) -> Option<usize> {
     use KeyCode::*;
     Some(match key {
@@ -25,12 +25,20 @@ pub fn input_events_to_lane_events(
         match ev {
             InputEvent::KeyDown(key) => {
                 if let Some(lane) = keycode_to_lane(*key) {
-                    lane_writer.write(LaneInputEvent { lane_index: lane, pressed: true });
+                    lane_writer.write(LaneInputEvent {
+                        lane_index: lane,
+                        pressed: true,
+                        raw: Some(RawInput::Key(*key)),
+                    });
                 }
             }
             InputEvent::KeyUp(key) => {
                 if let Some(lane) = keycode_to_lane(*key) {
-                    lane_writer.write(LaneInputEvent { lane_index: lane, pressed: false });
+                    lane_writer.write(LaneInputEvent {
+                        lane_index: lane,
+                        pressed: false,
+                        raw: Some(RawInput::Key(*key)),
+                    });
                 }
             }
             _ => {}
@@ -57,12 +65,30 @@ pub fn emit_gamepad_button_lane_input(
         ];
         for (btn, lane_index) in map {
             if gp.just_pressed(btn) {
-                writer.write(LaneInputEvent { lane_index, pressed: true });
+                writer.write(LaneInputEvent {
+                    lane_index,
+                    pressed: true,
+                    raw: Some(RawInput::Gamepad(btn)),
+                });
             }
             if gp.just_released(btn) {
-                writer.write(LaneInputEvent { lane_index, pressed: false });
+                writer.write(LaneInputEvent {
+                    lane_index,
+                    pressed: false,
+                    raw: Some(RawInput::Gamepad(btn)),
+                });
             }
         }
     }
 }
 
+pub fn record_lane_raw_events(
+    mut lane_reader: MessageReader<LaneInputEvent>,
+    mut last_raw: ResMut<LastRawByLane>,
+) {
+    for ev in lane_reader.read() {
+        if let Some(raw) = ev.raw.clone() {
+            (*last_raw).0.insert(ev.lane_index, raw);
+        }
+    }
+}
