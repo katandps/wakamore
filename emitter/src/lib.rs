@@ -92,3 +92,46 @@ pub fn record_lane_raw_events(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::prelude::*;
+    use common::InputEvent;
+
+    #[derive(Resource, Default)]
+    struct Out(pub Vec<LaneInputEvent>);
+
+    fn emit_input(mut writer: MessageWriter<InputEvent>) {
+        use KeyCode::*;
+        writer.write(InputEvent::KeyDown(KeyS));
+        writer.write(InputEvent::KeyUp(KeyS));
+    }
+
+    fn collect(mut reader: MessageReader<LaneInputEvent>, mut out: ResMut<Out>) {
+        for ev in reader.read() {
+            out.0.push(ev.clone());
+        }
+    }
+
+    #[test]
+    fn input_events_convert_to_lane_events() {
+        let mut app = App::new();
+        app.add_message::<InputEvent>();
+        app.add_message::<LaneInputEvent>();
+        app.init_resource::<Out>();
+        app.add_systems(Startup, emit_input);
+        app.add_systems(Update, (input_events_to_lane_events, collect));
+
+        // Run update cycles to ensure startup and message propagation
+        app.update();
+        app.update();
+
+        let out = app.world().resource::<Out>();
+        assert_eq!(out.0.len(), 2);
+        assert_eq!(out.0[0].lane_index, 0);
+        assert!(out.0[0].pressed);
+        assert_eq!(out.0[1].lane_index, 0);
+        assert!(!out.0[1].pressed);
+    }
+}
