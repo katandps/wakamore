@@ -21,6 +21,16 @@ pub trait InputSink: Send + Sync {
     fn send(&self, ev: InputEvent);
 }
 
+/// Trait to map a physical `KeyCode` to a high-level `InputAction`.
+/// Implementations live in the `input` crate and are registered as resources.
+pub trait KeyToAction: Send + Sync {
+    fn key_to_action(&self, key: KeyCode) -> Option<InputAction>;
+    /// Returns the set of physical keys that this mapping will report.
+    /// Used by `input` to know which keys to poll in addition to the
+    /// hardcoded tracked keys.
+    fn bound_keys(&self) -> Vec<KeyCode>;
+}
+
 #[derive(Clone, Debug)]
 pub enum RawInput {
     Key(KeyCode),
@@ -62,3 +72,6 @@ pub struct InputLog(pub Vec<LogEntry>);
 
 #[derive(Resource, Default, Debug)]
 pub struct LastRawByLane(pub HashMap<usize, RawInput>);
+
+#[derive(Resource)]
+pub struct KeyToActionResource(pub Box<dyn KeyToAction>);

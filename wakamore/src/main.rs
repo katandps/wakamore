@@ -30,6 +30,16 @@ use system::note_spawn::{
 use system::note_ui::sync_lane_ui_layout;
 
 fn main() {
+    // try to load bindings from `bindings.toml` in the current working directory;
+    // fall back to defaults if loading/parsing fails.
+    let initial_bindings = match input::Bindings::from_file("bindings.toml") {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("Failed to load bindings.toml: {}. Using defaults.", e);
+            input::Bindings::with_defaults()
+        }
+    };
+
     App::new()
         .insert_resource(WinitSettings::game())
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -44,6 +54,7 @@ fn main() {
         .init_state::<AppState>()
         .init_resource::<FpsHistory>()
         .init_resource::<LaneInputState>()
+        .insert_resource(common::KeyToActionResource(Box::new(initial_bindings)))
         .init_resource::<common::InputLog>()
         .init_resource::<common::LastRawByLane>()
         .init_resource::<component::ChartPlayback>()
