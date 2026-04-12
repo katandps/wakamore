@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["common", "input", "emitter", "wakamore"]
+members = ["common", "input", "emitter", "wakamore", "bms"]
 
 [profile.dev]
 
