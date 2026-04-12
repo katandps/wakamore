@@ -7,17 +7,17 @@ use crate::component::note::GameplayEntity;
 use crate::component::{
     JUDGE_LINE_Y_FROM_BOTTOM, NOTE_HEIGHT, NOTE_TRAVEL_SECONDS, lane_center_x, lane_specs,
 };
-use crate::resource::note::{Lane, NoteChart};
+use crate::resource::note::{Lane7S, NoteChart};
 
-const ALL_LANES: [Lane; 8] = [
-    Lane::S,
-    Lane::D,
-    Lane::F,
-    Lane::Space,
-    Lane::J,
-    Lane::K,
-    Lane::L,
-    Lane::Shift,
+const ALL_LANES: [Lane7S; 8] = [
+    Lane7S::Lane1,
+    Lane7S::Lane2,
+    Lane7S::Lane3,
+    Lane7S::Lane4,
+    Lane7S::Lane5,
+    Lane7S::Lane6,
+    Lane7S::Lane7,
+    Lane7S::Scratch,
 ];
 
 pub fn generate_random_chart(mut chart: ResMut<NoteChart>) {

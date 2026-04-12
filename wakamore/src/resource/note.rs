@@ -4,28 +4,28 @@ use crate::component::LANE_COUNT;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(usize)]
-pub enum Lane {
-    /// S キー（白）
-    S = 0,
-    /// D キー（青）
-    D = 1,
-    /// F キー（白）
-    F = 2,
-    /// Space キー（青）
-    Space = 3,
-    /// J キー（白）
-    J = 4,
-    /// K キー（青）
-    K = 5,
-    /// L キー（白）
-    L = 6,
-    /// Shift キー（赤）
-    Shift = 7,
+pub enum Lane7S {
+    /// Lane 1 (left-most)
+    Lane1 = 0,
+    /// Lane 2
+    Lane2 = 1,
+    /// Lane 3
+    Lane3 = 2,
+    /// Lane 4
+    Lane4 = 3,
+    /// Lane 5
+    Lane5 = 4,
+    /// Lane 6
+    Lane6 = 5,
+    /// Lane 7
+    Lane7 = 6,
+    /// Special lane (Scratch)
+    Scratch = 7,
 }
 
 #[derive(Clone, Debug)]
 pub struct ChartNote {
-    pub lane: Lane,
+    pub lane: Lane7S,
     pub time_from_start_secs: f32,
 }
 
@@ -39,19 +39,19 @@ impl NoteChart {
         Self {
             notes: vec![
                 ChartNote {
-                    lane: Lane::S,
+                    lane: Lane7S::Lane1,
                     time_from_start_secs: 0.50,
                 },
                 ChartNote {
-                    lane: Lane::Space,
+                    lane: Lane7S::Lane4,
                     time_from_start_secs: 0.90,
                 },
                 ChartNote {
-                    lane: Lane::K,
+                    lane: Lane7S::Lane6,
                     time_from_start_secs: 1.20,
                 },
                 ChartNote {
-                    lane: Lane::Shift,
+                    lane: Lane7S::Scratch,
                     time_from_start_secs: 1.70,
                 },
             ],
