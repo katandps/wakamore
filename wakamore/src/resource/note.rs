@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::component::{LANE_COUNT, lane_center_x};
+use crate::component::LANE_COUNT;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(usize)]
@@ -23,16 +23,9 @@ pub enum Lane {
     Shift = 7,
 }
 
-impl Lane {
-    pub fn center_x(self) -> f32 {
-        lane_center_x(self as usize)
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct ChartNote {
     pub lane: Lane,
-    pub sfx: String,
     pub time_from_start_secs: f32,
 }
 
@@ -47,22 +40,18 @@ impl NoteChart {
             notes: vec![
                 ChartNote {
                     lane: Lane::S,
-                    sfx: "kick".to_string(),
                     time_from_start_secs: 0.50,
                 },
                 ChartNote {
                     lane: Lane::Space,
-                    sfx: "snare".to_string(),
                     time_from_start_secs: 0.90,
                 },
                 ChartNote {
                     lane: Lane::K,
-                    sfx: "hihat".to_string(),
                     time_from_start_secs: 1.20,
                 },
                 ChartNote {
                     lane: Lane::Shift,
-                    sfx: "clap".to_string(),
                     time_from_start_secs: 1.70,
                 },
             ],

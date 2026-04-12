@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 bevy = "0.18.1"
-rand = "0.8.5"
+rand = { version = "0.10.0", features = ["std", "thread_rng", "sys_rng"] }
 common = { path = "../common" }
 input = { path = "../input" }
 emitter = { path = "../emitter" }

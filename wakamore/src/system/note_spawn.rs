@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use rand::Rng;
+use rand::prelude::*;
+use rand::rngs::SmallRng;
 
 use crate::component::note::GameplayEntity;
 use crate::component::{
@@ -19,22 +20,18 @@ const ALL_LANES: [Lane; 8] = [
     Lane::Shift,
 ];
 
-const ALL_SFX: [&str; 4] = ["kick", "snare", "hihat", "clap"];
-
 pub fn generate_random_chart(mut chart: ResMut<NoteChart>) {
-    let mut rng = rand::thread_rng();
-    let note_count: usize = rng.gen_range(8..=20);
+    let mut rng: SmallRng = rand::make_rng();
+    let note_count: usize = rng.random_range(8..=20);
     let mut notes = Vec::with_capacity(note_count);
-    let mut t = rng.gen_range(0.3_f32..=0.8);
+    let mut t = rng.random_range(0.3_f32..=0.8);
     for _ in 0..note_count {
-        let lane = ALL_LANES[rng.gen_range(0..ALL_LANES.len())];
-        let sfx = ALL_SFX[rng.gen_range(0..ALL_SFX.len())].to_string();
+        let lane = ALL_LANES[rng.random_range(0..ALL_LANES.len())];
         notes.push(crate::resource::note::ChartNote {
             lane,
-            sfx,
             time_from_start_secs: t,
         });
-        t += rng.gen_range(0.25_f32..=0.9);
+        t += rng.random_range(0.25_f32..=0.9);
     }
     chart.notes = notes;
 }

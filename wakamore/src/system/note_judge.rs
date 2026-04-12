@@ -6,8 +6,8 @@ use crate::component::{
     GR_WINDOW_MS, JUDGE_LINE_Y_FROM_BOTTOM, LANE_COUNT, NOTE_HEIGHT, NOTE_TRAVEL_SECONDS,
     PG_WINDOW_MS, SCORE_GR, SCORE_PG,
 };
-use crate::event::note::{JudgementKind, LaneInputEvent, LaneJudgementEvent};
 use crate::resource::note::ScoreSummary;
+use common::{JudgementKind, LaneInputEvent, LaneJudgementEvent};
 
 pub fn evaluate_lane_judgement(
     window_q: Query<&Window, With<PrimaryWindow>>,

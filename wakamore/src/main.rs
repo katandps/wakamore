@@ -1,6 +1,5 @@
 mod component;
 mod entity;
-mod event;
 mod resource;
 mod state;
 mod system;
@@ -13,7 +12,6 @@ use emitter::{
     emit_gamepad_button_lane_input, input_events_to_lane_events, record_lane_raw_events,
 };
 use entity::note::{setup_judge_line, setup_note};
-use event::note::{LaneInputEvent, LaneJudgementEvent};
 use input::poll_key_events;
 use resource::note::{LaneInputState, NoteChart, ScoreSummary};
 use state::{
@@ -60,9 +58,9 @@ fn main() {
         .init_resource::<component::ChartPlayback>()
         .insert_resource(NoteChart::demo())
         .init_resource::<ScoreSummary>()
-        .add_message::<LaneInputEvent>()
+        .add_message::<common::LaneInputEvent>()
         .add_message::<common::InputEvent>()
-        .add_message::<LaneJudgementEvent>()
+        .add_message::<common::LaneJudgementEvent>()
         .add_systems(Startup, (setup_camera, setup_fps))
         .add_systems(OnEnter(AppState::Title), setup_title)
         .add_systems(Update, update_title_input.run_if(in_state(AppState::Title)))

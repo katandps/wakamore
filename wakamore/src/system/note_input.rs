@@ -1,6 +1,6 @@
 use crate::component::note::LaneKeyIndicator;
-use crate::event::note::LaneInputEvent;
 use bevy::prelude::*;
+use common::LaneInputEvent;
 
 pub fn apply_lane_input_visuals(
     mut input_event_reader: MessageReader<LaneInputEvent>,
