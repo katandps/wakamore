@@ -21,7 +21,11 @@ pub enum HeaderKey {
     Total,
     Comment,
     LnType,
+    /// ステージ用ファイル指定 (`#STAGEFILE ...`)。
+    StageFile,
     Wav(u8),
+    /// BMP イメージ参照 (`#BMPnn ...`)。
+    Bmp(u8),
     Other(String),
 }
 
@@ -41,7 +45,9 @@ impl fmt::Display for HeaderKey {
             HeaderKey::Total => write!(f, "TOTAL"),
             HeaderKey::Comment => write!(f, "COMMENT"),
             HeaderKey::LnType => write!(f, "LNTYPE"),
-            HeaderKey::Wav(n) => write!(f, "WAV{:02}", n),
+            HeaderKey::Wav(n) => write!(f, "WAV{:02X}", n),
+            HeaderKey::StageFile => write!(f, "STAGEFILE"),
+            HeaderKey::Bmp(n) => write!(f, "BMP{:02X}", n),
             HeaderKey::Other(s) => write!(f, "{}", s),
         }
     }
@@ -91,6 +97,15 @@ impl Bms {
     pub fn wav(&self, id: u8) -> Option<&str> {
         self.header(&HeaderKey::Wav(id))
     }
+    /// `BMPnn` のエントリを取得します。
+    pub fn bmp(&self, id: u8) -> Option<&str> {
+        self.header(&HeaderKey::Bmp(id))
+    }
+
+    /// `#STAGEFILE` の値を取得します。
+    pub fn stagefile(&self) -> Option<&str> {
+        self.header(&HeaderKey::StageFile)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -120,38 +135,51 @@ pub fn parse_bms(s: &str) -> Result<Bms, String> {
         }
         let after = &line[1..];
         if let Some(colon_idx) = after.find(':') {
-            let left = &after[..colon_idx];
+            // Try to treat as a data line (#mmmcc:payload). If the left side
+            // doesn't parse as measure+channel, fall back to header parsing
+            // because some header values may contain ':' (e.g., "obj : LTFE").
+            let left = after[..colon_idx].trim();
             let data = after[colon_idx + 1..].trim();
-            if left.len() < 4 {
-                continue;
-            }
-            let measure_str = &left[..3];
-            let channel_str = &left[3..];
-            let measure: u32 = match measure_str.parse() {
-                Ok(v) => v,
-                Err(_) => return Err(format!("invalid measure '{}'", measure_str)),
-            };
-            let channel: u8 = match channel_str.parse() {
-                Ok(v) => v,
-                Err(_) => return Err(format!("invalid channel '{}'", channel_str)),
-            };
 
-            let mut chunks = Vec::new();
-            let mut idx = 0usize;
-            while idx + 2 <= data.len() {
-                let pair = &data[idx..idx + 2];
-                if pair != "00" {
-                    chunks.push(Some(pair.to_string()));
-                } else {
-                    chunks.push(None);
+            let mut handled_as_data = false;
+            if left.len() >= 4 {
+                let measure_str = &left[..3];
+                let channel_str = &left[3..];
+                if let (Ok(measure), Ok(channel)) = (
+                    measure_str.parse::<u32>(),
+                    channel_str.parse::<u8>(),
+                ) {
+                    let mut chunks = Vec::new();
+                    let mut idx = 0usize;
+                    while idx + 2 <= data.len() {
+                        let pair = &data[idx..idx + 2];
+                        if pair != "00" {
+                            chunks.push(Some(pair.to_string()));
+                        } else {
+                            chunks.push(None);
+                        }
+                        idx += 2;
+                    }
+                    let ch = ChannelData {
+                        channel,
+                        data: chunks,
+                    };
+                    measures.entry(measure).or_default().push(ch);
+                    handled_as_data = true;
                 }
-                idx += 2;
             }
-            let ch = ChannelData {
-                channel,
-                data: chunks,
-            };
-            measures.entry(measure).or_default().push(ch);
+
+            if !handled_as_data {
+                // Treat as a header line: parse key and value by whitespace.
+                let mut parts = after.splitn(2, |c: char| c.is_whitespace());
+                let key_raw = parts.next().unwrap_or("").trim();
+                let key = parse_header_key(key_raw);
+                let value = parts
+                    .next()
+                    .map(|v| v.trim().trim_matches('"').to_string())
+                    .unwrap_or_default();
+                headers.insert(key, value);
+            }
         } else {
             // header line like: KEY value
             let mut parts = after.splitn(2, |c: char| c.is_whitespace());
@@ -184,11 +212,20 @@ fn parse_header_key(s: &str) -> HeaderKey {
         "TOTAL" => HeaderKey::Total,
         "COMMENT" => HeaderKey::Comment,
         "LNTYPE" => HeaderKey::LnType,
+        "STAGEFILE" => HeaderKey::StageFile,
         _ => {
+            // WAV/BMP は後続の識別子を16進数として扱う (例: WAV0A -> 0x0A)
             if up.starts_with("WAV") && up.len() > 3 {
                 let num_str = &up[3..];
-                if let Ok(n) = num_str.parse::<u8>() {
+                if let Ok(n) = u8::from_str_radix(num_str, 16) {
                     HeaderKey::Wav(n)
+                } else {
+                    HeaderKey::Other(up)
+                }
+            } else if up.starts_with("BMP") && up.len() > 3 {
+                let num_str = &up[3..];
+                if let Ok(n) = u8::from_str_radix(num_str, 16) {
+                    HeaderKey::Bmp(n)
                 } else {
                     HeaderKey::Other(up)
                 }

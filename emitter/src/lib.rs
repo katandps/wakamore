@@ -96,7 +96,6 @@ pub fn record_lane_raw_events(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy::prelude::*;
     use common::InputEvent;
 
     #[derive(Resource, Default)]
