@@ -145,10 +145,9 @@ pub fn parse_bms(s: &str) -> Result<Bms, String> {
             if left.len() >= 4 {
                 let measure_str = &left[..3];
                 let channel_str = &left[3..];
-                if let (Ok(measure), Ok(channel)) = (
-                    measure_str.parse::<u32>(),
-                    channel_str.parse::<u8>(),
-                ) {
+                if let (Ok(measure), Ok(channel)) =
+                    (measure_str.parse::<u32>(), channel_str.parse::<u8>())
+                {
                     let mut chunks = Vec::new();
                     let mut idx = 0usize;
                     while idx + 2 <= data.len() {
