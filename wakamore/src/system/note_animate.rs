@@ -1,18 +1,16 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use rand::prelude::*;
-use rand::rngs::SmallRng;
+// respawn removed; no RNG required
 
 use crate::component::note::Note;
-use crate::component::{
-    JUDGE_LINE_Y_FROM_BOTTOM, NOTE_HEIGHT, NOTE_TRAVEL_SECONDS, RESPAWN_DELAY_MAX_SECONDS,
-    RESPAWN_DELAY_MIN_SECONDS,
-};
+use crate::component::{JUDGE_LINE_Y_FROM_BOTTOM, NOTE_HEIGHT, NOTE_TRAVEL_SECONDS};
+use crate::system::note_spawn::ChartPlayback;
 
 pub fn animate_note(
-    time: Res<Time>,
     window_q: Query<&Window, With<PrimaryWindow>>,
-    mut note_q: Query<(&mut Transform, &mut Visibility, &mut Note)>,
+    mut commands: Commands,
+    mut note_q: Query<(Entity, &mut Transform, &mut Visibility, &Note)>,
+    playback: Res<ChartPlayback>,
 ) {
     let Ok(window) = window_q.single() else {
         return;
@@ -23,26 +21,24 @@ pub fn animate_note(
     let bottom_y = -half_h - NOTE_HEIGHT * 0.5;
     let travel_distance = top_y - bottom_y;
     let speed = travel_distance / NOTE_TRAVEL_SECONDS;
-    let mut rng: SmallRng = rand::make_rng();
-    for (mut transform, mut visibility, mut note) in &mut note_q {
-        if !note.initialized {
-            transform.translation.y = top_y;
-            note.initialized = true;
+    for (entity, mut transform, mut visibility, note) in &mut note_q {
+        // Compute exact position from scheduled time and playback elapsed time:
+        // y = judge_line_y + (scheduled_time - elapsed) * speed
+        let time_until_judge = note.scheduled_time_secs - playback.elapsed_secs;
+        let mut y = judge_line_y + time_until_judge * speed;
+
+        // Clamp to top; if below bottom, despawn the entity (no respawn)
+        if y > top_y {
+            y = top_y;
         }
-        if note.respawn_delay_remaining > 0.0 {
-            note.respawn_delay_remaining -= time.delta_secs();
-            if note.respawn_delay_remaining <= 0.0 {
-                transform.translation.y = top_y;
-                note.respawn_delay_remaining = 0.0;
-            }
+        if y < bottom_y {
+            commands.entity(entity).despawn();
             continue;
         }
-        transform.translation.y -= speed * time.delta_secs();
-        if transform.translation.y < bottom_y {
-            transform.translation.y = bottom_y;
-            note.respawn_delay_remaining =
-                rng.random_range(RESPAWN_DELAY_MIN_SECONDS..RESPAWN_DELAY_MAX_SECONDS);
-        }
+
+        transform.translation.y = y;
+
+        // Visibility based on judge line
         if transform.translation.y < judge_line_y {
             *visibility = Visibility::Hidden;
         } else {

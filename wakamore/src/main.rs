@@ -23,7 +23,7 @@ use system::note_animate::animate_note;
 use system::note_input::apply_lane_input_visuals;
 use system::note_judge::{apply_judgement_display, evaluate_lane_judgement};
 use system::note_spawn::{
-    generate_random_chart, reset_playback, reset_score_summary, spawn_notes_from_chart,
+    prepare_chart, reset_playback, reset_score_summary, spawn_notes_from_chart,
 };
 use system::note_ui::sync_lane_ui_layout;
 
@@ -68,7 +68,7 @@ fn main() {
         .add_systems(
             OnEnter(AppState::Playing),
             (
-                generate_random_chart,
+                prepare_chart,
                 reset_score_summary,
                 reset_playback,
                 setup_note,

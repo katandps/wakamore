@@ -9,5 +9,6 @@ rand = { version = "0.10.0", features = ["std", "thread_rng", "sys_rng"] }
 common = { path = "../common" }
 input = { path = "../input" }
 emitter = { path = "../emitter" }
+bms = { path = "../bms" }
 
 [package.metadata]

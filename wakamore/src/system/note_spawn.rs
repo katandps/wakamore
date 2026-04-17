@@ -7,7 +7,9 @@ use crate::component::note::GameplayEntity;
 use crate::component::{
     JUDGE_LINE_Y_FROM_BOTTOM, NOTE_HEIGHT, NOTE_TRAVEL_SECONDS, lane_center_x, lane_specs,
 };
+use crate::resource::note::NoteChart as ResourceNoteChart;
 use crate::resource::note::{Lane7S, NoteChart};
+use std::fs;
 
 const ALL_LANES: [Lane7S; 8] = [
     Lane7S::Lane1,
@@ -84,8 +86,7 @@ pub fn spawn_notes_from_chart(
                 Transform::from_xyz(x, top_y, 0.0),
                 crate::component::note::Note {
                     lane_index,
-                    initialized: false,
-                    respawn_delay_remaining: 0.0,
+                    scheduled_time_secs: note.time_from_start_secs,
                 },
                 GameplayEntity,
             ));
@@ -94,4 +95,23 @@ pub fn spawn_notes_from_chart(
             break;
         }
     }
+}
+
+/// Prepare chart for playback: try loading a BMS file, fall back to random generation.
+pub fn prepare_chart(mut chart: ResMut<NoteChart>) {
+    // prefer a bundled test file if present
+    if let Ok(s) = fs::read_to_string("bms/tests/test.bms") {
+        match bms::parse_bms(&s) {
+            Ok(parsed) => {
+                *chart = ResourceNoteChart::from_bms(&parsed);
+                return;
+            }
+            Err(e) => {
+                eprintln!("Failed to parse bms/tests/test.bms: {}", e);
+            }
+        }
+    }
+
+    // fallback to existing random generator logic
+    generate_random_chart(chart);
 }

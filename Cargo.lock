@@ -4997,6 +4997,7 @@ name = "wakamore"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bms",
  "common",
  "emitter",
  "input",

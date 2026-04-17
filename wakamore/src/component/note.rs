@@ -3,8 +3,9 @@ use bevy::prelude::*;
 #[derive(Component)]
 pub struct Note {
     pub(crate) lane_index: usize,
-    pub(crate) initialized: bool,
-    pub(crate) respawn_delay_remaining: f32,
+    // The scheduled time (in seconds from playback start) when this note should be judged.
+    // Used to compute exact drawing position from playback time and speed.
+    pub(crate) scheduled_time_secs: f32,
 }
 
 #[derive(Component)]
