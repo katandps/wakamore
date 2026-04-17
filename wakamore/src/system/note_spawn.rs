@@ -46,11 +46,55 @@ pub fn reset_score_summary(mut score_summary: ResMut<crate::resource::note::Scor
 pub struct ChartPlayback {
     pub elapsed_secs: f32,
     pub cursor: usize,
+    // whether we've already shown the "playback finished" message
+    pub finished_shown: bool,
 }
 
 pub fn reset_playback(mut playback: ResMut<ChartPlayback>) {
     playback.elapsed_secs = 0.0;
-    playback.cursor = 0
+    playback.cursor = 0;
+    playback.finished_shown = false;
+}
+
+pub fn check_playback_finished(
+    mut commands: Commands,
+    mut playback: ResMut<ChartPlayback>,
+    chart: Res<NoteChart>,
+    note_q: Query<&crate::component::note::Note>,
+) {
+    // already shown -> nothing to do
+    if playback.finished_shown {
+        return;
+    }
+
+    // if there are still notes to spawn, not finished yet
+    if playback.cursor < chart.notes.len() {
+        return;
+    }
+
+    // if any note entities still exist on screen, wait until they're gone
+    if !note_q.is_empty() {
+        return;
+    }
+
+    // spawn a simple UI text to indicate playback finished
+    commands.spawn((
+        Text::new("finished"),
+        TextFont {
+            font_size: 36.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Percent(30.0),
+            top: Val::Percent(8.0),
+            ..default()
+        },
+        GameplayEntity,
+    ));
+
+    playback.finished_shown = true;
 }
 
 pub fn spawn_notes_from_chart(

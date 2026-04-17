@@ -23,7 +23,8 @@ use system::note_animate::animate_note;
 use system::note_input::apply_lane_input_visuals;
 use system::note_judge::{apply_judgement_display, evaluate_lane_judgement};
 use system::note_spawn::{
-    prepare_chart, reset_playback, reset_score_summary, spawn_notes_from_chart,
+    check_playback_finished, prepare_chart, reset_playback, reset_score_summary,
+    spawn_notes_from_chart,
 };
 use system::note_ui::sync_lane_ui_layout;
 
@@ -62,6 +63,7 @@ fn main() {
         .add_message::<common::InputEvent>()
         .add_message::<common::LaneJudgementEvent>()
         .add_systems(Startup, (setup_camera, setup_fps))
+        .add_systems(Startup, setup_ui_font)
         .add_systems(OnEnter(AppState::Title), setup_title)
         .add_systems(Update, update_title_input.run_if(in_state(AppState::Title)))
         .add_systems(OnExit(AppState::Title), cleanup_title)
@@ -89,6 +91,7 @@ fn main() {
                 apply_judgement_display,
                 animate_note,
                 spawn_notes_from_chart,
+                check_playback_finished,
                 sync_lane_ui_layout,
             )
                 .chain()
@@ -111,5 +114,13 @@ fn main() {
 
 fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2d::default());
+}
+
+#[derive(Resource)]
+pub struct UiFont(pub Handle<Font>);
+
+fn setup_ui_font(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let font: Handle<Font> = asset_server.load("fonts/NotoSansJP-Regular.ttf");
+    commands.insert_resource(UiFont(font));
 }
 // State-specific systems are provided by `state` module submodules.
