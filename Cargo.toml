@@ -1,6 +1,10 @@
-[package]
-name = "wakamore"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "3"
+members = ["common", "input", "emitter", "wakamore", "wakamore_render", "bms"]
 
-[dependencies]
+[profile.dev]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
