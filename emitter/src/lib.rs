@@ -1,20 +1,14 @@
 //! emitter: adapters that turn `InputEvent` into runtime events.
 
 use bevy::prelude::*;
-use common::{InputEvent, LaneInputEvent, LastRawByLane, RawInput};
-fn keycode_to_lane(key: KeyCode) -> Option<usize> {
-    use KeyCode::*;
-    Some(match key {
-        KeyS => 0,
-        KeyD => 1,
-        KeyF => 2,
-        Space => 3,
-        KeyJ => 4,
-        KeyK => 5,
-        KeyL => 6,
-        ShiftLeft | ShiftRight => 7,
-        _ => return None,
-    })
+use common::{InputEvent, LaneInputEvent, LastRawByLane, PlayKey, RawInput, ScratchKey};
+
+fn play_key_to_lane(play_key: PlayKey) -> usize {
+    play_key.lane_index()
+}
+
+fn scratch_key_to_lane(scratch_key: ScratchKey) -> usize {
+    scratch_key.lane_index()
 }
 
 pub fn input_events_to_lane_events(
@@ -23,23 +17,33 @@ pub fn input_events_to_lane_events(
 ) {
     for ev in input_reader.read() {
         match ev {
-            InputEvent::KeyDown(key) => {
-                if let Some(lane) = keycode_to_lane(*key) {
-                    lane_writer.write(LaneInputEvent {
-                        lane_index: lane,
-                        pressed: true,
-                        raw: Some(RawInput::Key(*key)),
-                    });
-                }
+            InputEvent::PlayKeyDown(play_key) => {
+                lane_writer.write(LaneInputEvent {
+                    lane_index: play_key_to_lane(*play_key),
+                    pressed: true,
+                    raw: None,
+                });
             }
-            InputEvent::KeyUp(key) => {
-                if let Some(lane) = keycode_to_lane(*key) {
-                    lane_writer.write(LaneInputEvent {
-                        lane_index: lane,
-                        pressed: false,
-                        raw: Some(RawInput::Key(*key)),
-                    });
-                }
+            InputEvent::PlayKeyUp(play_key) => {
+                lane_writer.write(LaneInputEvent {
+                    lane_index: play_key_to_lane(*play_key),
+                    pressed: false,
+                    raw: None,
+                });
+            }
+            InputEvent::ScratchDown(scratch_key) => {
+                lane_writer.write(LaneInputEvent {
+                    lane_index: scratch_key_to_lane(*scratch_key),
+                    pressed: true,
+                    raw: None,
+                });
+            }
+            InputEvent::ScratchUp(scratch_key) => {
+                lane_writer.write(LaneInputEvent {
+                    lane_index: scratch_key_to_lane(*scratch_key),
+                    pressed: false,
+                    raw: None,
+                });
             }
             _ => {}
         }
@@ -102,9 +106,8 @@ mod tests {
     struct Out(pub Vec<LaneInputEvent>);
 
     fn emit_input(mut writer: MessageWriter<InputEvent>) {
-        use KeyCode::*;
-        writer.write(InputEvent::KeyDown(KeyS));
-        writer.write(InputEvent::KeyUp(KeyS));
+        writer.write(InputEvent::PlayKeyDown(PlayKey::Key1));
+        writer.write(InputEvent::PlayKeyUp(PlayKey::Key1));
     }
 
     fn collect(mut reader: MessageReader<LaneInputEvent>, mut out: ResMut<Out>) {

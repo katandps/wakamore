@@ -1,7 +1,7 @@
 //! input: key polling and conversion to `common::InputEvent`.
 
 use bevy::prelude::*;
-use common::{InputAction, InputEvent, KeyToAction, KeyToActionResource};
+use common::{InputAction, InputEvent, KeyToAction, KeyToActionResource, PlayKey, ScratchKey};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Resource, Debug, Default)]
@@ -155,7 +155,12 @@ pub fn poll_key_events(
 
     for key in tracked {
         if keys.just_pressed(key) {
-            ev_writer.write(InputEvent::KeyDown(key));
+            if let Some(play_key) = PlayKey::from_keycode(key) {
+                ev_writer.write(InputEvent::PlayKeyDown(play_key));
+            }
+            if let Some(scratch_key) = ScratchKey::from_keycode(key) {
+                ev_writer.write(InputEvent::ScratchDown(scratch_key));
+            }
             if let Some(b) = bindings.as_ref() {
                 if let Some(action) = b.0.key_to_action(key) {
                     ev_writer.write(InputEvent::Action(action));
@@ -163,7 +168,12 @@ pub fn poll_key_events(
             }
         }
         if keys.just_released(key) {
-            ev_writer.write(InputEvent::KeyUp(key));
+            if let Some(play_key) = PlayKey::from_keycode(key) {
+                ev_writer.write(InputEvent::PlayKeyUp(play_key));
+            }
+            if let Some(scratch_key) = ScratchKey::from_keycode(key) {
+                ev_writer.write(InputEvent::ScratchUp(scratch_key));
+            }
         }
     }
 }
