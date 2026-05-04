@@ -5002,6 +5002,15 @@ dependencies = [
  "emitter",
  "input",
  "rand 0.10.0",
+ "wakamore_render",
+]
+
+[[package]]
+name = "wakamore_render"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "common",
 ]
 
 [[package]]

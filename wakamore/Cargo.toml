@@ -10,5 +10,6 @@ common = { path = "../common" }
 input = { path = "../input" }
 emitter = { path = "../emitter" }
 bms = { path = "../bms" }
+wakamore_render = { path = "../wakamore_render" }
 
 [package.metadata]

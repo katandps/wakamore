@@ -2,26 +2,24 @@ use bevy::prelude::*;
 
 use crate::component::ScoreSummary;
 use crate::state::{AppState, ResultEntity};
+use wakamore_render::ResultSummaryView;
 
-pub fn setup_result(mut commands: Commands, score_summary: Res<ScoreSummary>) {
-    commands.spawn((
-        Text::new(format!(
-            "Result\nScore: {}\nPG: {}  GR: {}  MISS: {}\nPress Enter: Title\nPress Space: Retry",
-            score_summary.score, score_summary.pg, score_summary.gr, score_summary.miss
-        )),
-        TextFont {
-            font_size: 42.0,
-            ..default()
-        },
-        TextColor(Color::WHITE),
-        Node {
-            position_type: PositionType::Absolute,
-            left: Val::Percent(33.0),
-            top: Val::Percent(40.0),
-            ..default()
-        },
-        ResultEntity,
-    ));
+impl ResultSummaryView for ScoreSummary {
+    fn score(&self) -> u32 {
+        self.score
+    }
+
+    fn pg(&self) -> u32 {
+        self.pg
+    }
+
+    fn gr(&self) -> u32 {
+        self.gr
+    }
+
+    fn miss(&self) -> u32 {
+        self.miss
+    }
 }
 
 pub fn update_result_input(

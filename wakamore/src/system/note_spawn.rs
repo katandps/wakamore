@@ -3,7 +3,7 @@ use bevy::window::PrimaryWindow;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 
-use crate::component::note::GameplayEntity;
+use crate::component::GameplayEntity;
 use crate::component::{
     JUDGE_LINE_Y_FROM_BOTTOM, NOTE_HEIGHT, NOTE_TRAVEL_SECONDS, lane_center_x, lane_specs,
 };

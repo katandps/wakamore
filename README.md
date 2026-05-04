@@ -36,6 +36,7 @@ BMSの主要なフォーマットを再生できる
 - `common`: 共通型（イベント、トレイト）。Bevy の `Event` / `Message` を利用する型を定義します。
 - `input`: キー入力の収集を担当し、低レベルの `common::InputEvent` を発行します（Bevy system）。
 - `emitter`: `common::InputEvent` をゲーム側の `LaneInputEvent` 等に変換して発行します（ゲームパッドマッピングもここにあります）。
+- `wakamore_render`: 描画・表示層の crate。カメラ初期化、UI 初期化、レーン表示、判定表示、タイトル/リザルト表示、および描画系 Plugin (`WakamoreRenderPlugin`) を提供します。
 - ルート (`wakamore`): 実際のゲーム本体（`src/`）で、`input` / `emitter` / `common` を利用します。
 
 簡単な開発コマンド:
@@ -53,7 +54,7 @@ cargo run --package wakamore
 
 移行ノート:
 
-既存の `src/system/note_input.rs` はビジュアルの反映（`apply_lane_input_visuals`）のみ残し、入力収集とイベント発行の責務は `input` / `emitter` に分離しました。
+入力収集とイベント発行の責務は `input` / `emitter` に分離され、表示更新処理は `wakamore_render` に移設されています。`wakamore` はゲーム進行ロジックと状態遷移を中心に担当します。
 
 問題や改善点:
 

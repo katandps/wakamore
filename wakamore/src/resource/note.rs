@@ -1,7 +1,5 @@
 use bevy::prelude::*;
 
-use crate::component::LANE_COUNT;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(usize)]
 pub enum Lane7S {
@@ -134,19 +132,4 @@ pub struct ScoreSummary {
     pub gr: u32,
     pub miss: u32,
     pub score: u32,
-}
-
-#[derive(Resource)]
-pub struct LaneInputState {
-    pub pressed: [bool; LANE_COUNT],
-    pub just_pressed: [bool; LANE_COUNT],
-}
-
-impl Default for LaneInputState {
-    fn default() -> Self {
-        Self {
-            pressed: [false; LANE_COUNT],
-            just_pressed: [false; LANE_COUNT],
-        }
-    }
 }

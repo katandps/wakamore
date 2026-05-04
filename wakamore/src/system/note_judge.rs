@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use crate::component::note::LaneJudgeText;
 use crate::component::{
     GR_WINDOW_MS, JUDGE_LINE_Y_FROM_BOTTOM, LANE_COUNT, NOTE_HEIGHT, NOTE_TRAVEL_SECONDS,
     PG_WINDOW_MS, SCORE_GR, SCORE_PG,
@@ -62,43 +61,6 @@ pub fn evaluate_lane_judgement(
                 lane_index,
                 kind: JudgementKind::Miss,
             });
-        }
-    }
-}
-
-pub fn apply_judgement_display(
-    time: Res<Time>,
-    mut judgement_event_reader: MessageReader<LaneJudgementEvent>,
-    mut judge_text_q: Query<(&mut LaneJudgeText, &mut Text, &mut TextColor)>,
-) {
-    for (mut judge_text, mut text, _) in &mut judge_text_q {
-        if judge_text.remaining_secs > 0.0 {
-            judge_text.remaining_secs -= time.delta_secs();
-            if judge_text.remaining_secs <= 0.0 {
-                text.0.clear();
-            }
-        }
-    }
-    for event in judgement_event_reader.read() {
-        for (mut judge_text, mut text, mut text_color) in &mut judge_text_q {
-            if judge_text.index != event.lane_index {
-                continue;
-            }
-            match event.kind {
-                JudgementKind::Pg => {
-                    text.0 = "PG".to_string();
-                    text_color.0 = Color::srgb(1.0, 0.92, 0.35);
-                }
-                JudgementKind::Gr => {
-                    text.0 = "GR".to_string();
-                    text_color.0 = Color::srgb(0.45, 0.95, 0.45);
-                }
-                JudgementKind::Miss => {
-                    text.0 = "MISS".to_string();
-                    text_color.0 = Color::srgb(1.0, 0.4, 0.4);
-                }
-            }
-            judge_text.remaining_secs = crate::component::JUDGEMENT_DISPLAY_SECONDS;
         }
     }
 }
