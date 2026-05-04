@@ -1,78 +1,157 @@
 //! input: key polling and conversion to `common::InputEvent`.
 
 use bevy::prelude::*;
-use common::{InputAction, InputEvent, KeyToAction, KeyToActionResource, PlayKey, ScratchKey};
+use common::{InputAction, InputEvent, PlayKey, ScratchKey};
 use std::collections::{HashMap, HashSet};
 
+const DEFAULT_BINDINGS_TOML: &str = r#"
+[play_keys]
+S = "Key1"
+D = "Key2"
+F = "Key3"
+J = "Key4"
+K = "Key5"
+L = "Key6"
+ShiftLeft = "Key7"
+
+[scratch_keys]
+Space = "Scratch"
+
+[actions]
+Enter = "Confirm"
+Escape = "Cancel"
+"#;
+
 #[derive(Resource, Debug, Default)]
-pub struct Bindings(pub HashMap<KeyCode, InputAction>);
+pub struct Bindings {
+    action_by_key: HashMap<KeyCode, InputAction>,
+    play_key_by_key: HashMap<KeyCode, PlayKey>,
+    scratch_key_by_key: HashMap<KeyCode, ScratchKey>,
+}
 
 impl Bindings {
     /// Returns a bindings set with sensible defaults.
     pub fn with_defaults() -> Self {
-        use KeyCode::*;
-        let mut map = HashMap::new();
-        map.insert(Space, InputAction::Confirm);
-        map.insert(Enter, InputAction::Confirm);
-        map.insert(Escape, InputAction::Cancel);
-        Self(map)
+        Self::from_toml_str(DEFAULT_BINDINGS_TOML).expect("default bindings TOML must be valid")
     }
 
     pub fn keys(&self) -> impl Iterator<Item = KeyCode> + '_ {
-        self.0.keys().copied()
+        self.action_by_key
+            .keys()
+            .chain(self.play_key_by_key.keys())
+            .chain(self.scratch_key_by_key.keys())
+            .copied()
     }
 
-    pub fn map_key(&self, key: KeyCode) -> Option<InputAction> {
-        self.0.get(&key).cloned()
-    }
-}
-
-impl KeyToAction for Bindings {
-    fn key_to_action(&self, key: KeyCode) -> Option<InputAction> {
-        self.map_key(key)
+    pub fn action_for_key(&self, key: KeyCode) -> Option<InputAction> {
+        self.action_by_key.get(&key).cloned()
     }
 
-    fn bound_keys(&self) -> Vec<KeyCode> {
-        self.0.keys().copied().collect()
+    pub fn play_key_for_key(&self, key: KeyCode) -> Option<PlayKey> {
+        self.play_key_by_key.get(&key).copied()
+    }
+
+    pub fn scratch_key_for_key(&self, key: KeyCode) -> Option<ScratchKey> {
+        self.scratch_key_by_key.get(&key).copied()
     }
 }
 
 impl Bindings {
     /// Attempt to load bindings from a TOML file at `path`.
     /// Expected format:
-    /// [bindings]
-    /// Space = "Confirm"
+    /// [play_keys]
+    /// S = "Key1"
+    ///
+    /// [scratch_keys]
+    /// Space = "Scratch"
+    ///
+    /// [actions]
     /// Enter = "Confirm"
+    /// Escape = "Cancel"
     pub fn from_file<P: AsRef<std::path::Path>>(
         path: P,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let s = std::fs::read_to_string(path)?;
+        Self::from_toml_str(&s)
+    }
+
+    fn from_toml_str(s: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let v: toml::Value = toml::from_str(&s)?;
-        let mut map = HashMap::new();
-        if let Some(bindings_table) = v.get("bindings") {
-            if let toml::Value::Table(tbl) = bindings_table {
-                for (k, val) in tbl {
-                    if let toml::Value::String(action_str) = val {
-                        let action = match action_str.as_str() {
-                            "Confirm" | "confirm" => InputAction::Confirm,
-                            "Cancel" | "cancel" => InputAction::Cancel,
-                            other => {
-                                eprintln!("unknown action '{}', skipping", other);
-                                continue;
-                            }
-                        };
-                        if let Some(keycode) = parse_keycode(k) {
-                            map.insert(keycode, action);
-                        } else {
-                            eprintln!("unknown key '{}', skipping", k);
-                        }
-                    } else {
-                        eprintln!("invalid action value for key '{}', skipping", k);
-                    }
-                }
+        let mut bindings = Self::default();
+
+        parse_section(&v, "actions", |key, mapped| {
+            if let Some(action) = parse_input_action(mapped) {
+                bindings.action_by_key.insert(key, action);
+            } else {
+                eprintln!("unknown action '{}', skipping", mapped);
             }
-        }
-        Ok(Self(map))
+        });
+
+        parse_section(&v, "play_keys", |key, mapped| {
+            if let Some(play_key) = parse_play_key(mapped) {
+                bindings.play_key_by_key.insert(key, play_key);
+            } else {
+                eprintln!("unknown play key '{}', skipping", mapped);
+            }
+        });
+
+        parse_section(&v, "scratch_keys", |key, mapped| {
+            if let Some(scratch_key) = parse_scratch_key(mapped) {
+                bindings.scratch_key_by_key.insert(key, scratch_key);
+            } else {
+                eprintln!("unknown scratch key '{}', skipping", mapped);
+            }
+        });
+
+        Ok(bindings)
+    }
+}
+
+fn parse_section<F>(v: &toml::Value, name: &str, mut on_entry: F)
+where
+    F: FnMut(KeyCode, &str),
+{
+    let Some(toml::Value::Table(tbl)) = v.get(name) else {
+        return;
+    };
+    for (k, val) in tbl {
+        let Some(keycode) = parse_keycode(k) else {
+            eprintln!("unknown key '{}', skipping", k);
+            continue;
+        };
+        let toml::Value::String(mapped) = val else {
+            eprintln!("invalid mapped value for key '{}', skipping", k);
+            continue;
+        };
+        on_entry(keycode, mapped);
+    }
+}
+
+fn parse_input_action(s: &str) -> Option<InputAction> {
+    match s {
+        "Confirm" | "confirm" => Some(InputAction::Confirm),
+        "Cancel" | "cancel" => Some(InputAction::Cancel),
+        _ => None,
+    }
+}
+
+fn parse_play_key(s: &str) -> Option<PlayKey> {
+    match s {
+        "Key1" | "1" => Some(PlayKey::Key1),
+        "Key2" | "2" => Some(PlayKey::Key2),
+        "Key3" | "3" => Some(PlayKey::Key3),
+        "Key4" | "4" => Some(PlayKey::Key4),
+        "Key5" | "5" => Some(PlayKey::Key5),
+        "Key6" | "6" => Some(PlayKey::Key6),
+        "Key7" | "7" => Some(PlayKey::Key7),
+        _ => None,
+    }
+}
+
+fn parse_scratch_key(s: &str) -> Option<ScratchKey> {
+    match s {
+        "Scratch" | "scratch" => Some(ScratchKey::Scratch),
+        _ => None,
     }
 }
 
@@ -134,44 +213,30 @@ fn parse_keycode(s: &str) -> Option<KeyCode> {
 pub fn poll_key_events(
     keys: Res<ButtonInput<KeyCode>>,
     mut ev_writer: MessageWriter<InputEvent>,
-    bindings: Option<Res<KeyToActionResource>>,
+    bindings: Res<Bindings>,
 ) {
-    use KeyCode::*;
-
-    const TRACKED_KEYS: [KeyCode; 9] = [
-        KeyS, KeyD, KeyF, Space, KeyJ, KeyK, KeyL, ShiftLeft, ShiftRight,
-    ];
-
-    // build union of tracked keys and keys present in bindings
     let mut tracked = HashSet::new();
-    for k in TRACKED_KEYS {
+    for k in bindings.keys() {
         tracked.insert(k);
-    }
-    if let Some(b) = bindings.as_ref() {
-        for k in b.0.bound_keys() {
-            tracked.insert(k);
-        }
     }
 
     for key in tracked {
         if keys.just_pressed(key) {
-            if let Some(play_key) = PlayKey::from_keycode(key) {
+            if let Some(play_key) = bindings.play_key_for_key(key) {
                 ev_writer.write(InputEvent::PlayKeyDown(play_key));
             }
-            if let Some(scratch_key) = ScratchKey::from_keycode(key) {
+            if let Some(scratch_key) = bindings.scratch_key_for_key(key) {
                 ev_writer.write(InputEvent::ScratchDown(scratch_key));
             }
-            if let Some(b) = bindings.as_ref() {
-                if let Some(action) = b.0.key_to_action(key) {
-                    ev_writer.write(InputEvent::Action(action));
-                }
+            if let Some(action) = bindings.action_for_key(key) {
+                ev_writer.write(InputEvent::Action(action));
             }
         }
         if keys.just_released(key) {
-            if let Some(play_key) = PlayKey::from_keycode(key) {
+            if let Some(play_key) = bindings.play_key_for_key(key) {
                 ev_writer.write(InputEvent::PlayKeyUp(play_key));
             }
-            if let Some(scratch_key) = ScratchKey::from_keycode(key) {
+            if let Some(scratch_key) = bindings.scratch_key_for_key(key) {
                 ev_writer.write(InputEvent::ScratchUp(scratch_key));
             }
         }
@@ -190,25 +255,39 @@ mod tests {
             std::process::id()
         ));
         let toml = r#"
-[bindings]
-Space = "Confirm"
+[actions]
 Enter = "Confirm"
-A = "Cancel"
+Escape = "Cancel"
+
+[play_keys]
+S = "Key1"
+J = "Key4"
+
+[scratch_keys]
+Space = "Scratch"
 "#;
         std::fs::write(&path, toml)?;
 
         let b = Bindings::from_file(&path)?;
         assert_eq!(
-            b.map_key(bevy::prelude::KeyCode::Space),
+            b.action_for_key(bevy::prelude::KeyCode::Enter),
             Some(InputAction::Confirm)
         );
         assert_eq!(
-            b.map_key(bevy::prelude::KeyCode::Enter),
-            Some(InputAction::Confirm)
-        );
-        assert_eq!(
-            b.map_key(bevy::prelude::KeyCode::KeyA),
+            b.action_for_key(bevy::prelude::KeyCode::Escape),
             Some(InputAction::Cancel)
+        );
+        assert_eq!(
+            b.play_key_for_key(bevy::prelude::KeyCode::KeyS),
+            Some(PlayKey::Key1)
+        );
+        assert_eq!(
+            b.play_key_for_key(bevy::prelude::KeyCode::KeyJ),
+            Some(PlayKey::Key4)
+        );
+        assert_eq!(
+            b.scratch_key_for_key(bevy::prelude::KeyCode::Space),
+            Some(ScratchKey::Scratch)
         );
 
         let _ = std::fs::remove_file(&path);

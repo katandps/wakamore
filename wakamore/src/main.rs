@@ -63,7 +63,7 @@ fn main() {
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .init_state::<AppState>()
         .init_resource::<FpsHistory>()
-        .insert_resource(common::KeyToActionResource(Box::new(initial_bindings)))
+        .insert_resource(initial_bindings)
         .init_resource::<common::InputLog>()
         .init_resource::<common::LastRawByLane>()
         .init_resource::<component::ChartPlayback>()

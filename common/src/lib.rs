@@ -38,33 +38,11 @@ impl PlayKey {
             PlayKey::Key7 => 7,
         }
     }
-
-    pub fn from_keycode(key: KeyCode) -> Option<Self> {
-        use KeyCode::*;
-        Some(match key {
-            KeyS => PlayKey::Key1,
-            KeyD => PlayKey::Key2,
-            KeyF => PlayKey::Key3,
-            KeyJ => PlayKey::Key4,
-            KeyK => PlayKey::Key5,
-            KeyL => PlayKey::Key6,
-            ShiftLeft | ShiftRight => PlayKey::Key7,
-            _ => return None,
-        })
-    }
 }
 
 impl ScratchKey {
     pub fn lane_index(self) -> usize {
         3
-    }
-
-    pub fn from_keycode(key: KeyCode) -> Option<Self> {
-        use KeyCode::*;
-        match key {
-            Space => Some(ScratchKey::Scratch),
-            _ => None,
-        }
     }
 }
 
@@ -79,16 +57,6 @@ pub enum InputEvent {
 
 pub trait InputSink: Send + Sync {
     fn send(&self, ev: InputEvent);
-}
-
-/// Trait to map a physical `KeyCode` to a high-level `InputAction`.
-/// Implementations live in the `input` crate and are registered as resources.
-pub trait KeyToAction: Send + Sync {
-    fn key_to_action(&self, key: KeyCode) -> Option<InputAction>;
-    /// Returns the set of physical keys that this mapping will report.
-    /// Used by `input` to know which keys to poll in addition to the
-    /// hardcoded tracked keys.
-    fn bound_keys(&self) -> Vec<KeyCode>;
 }
 
 #[derive(Clone, Debug)]
@@ -132,6 +100,3 @@ pub struct InputLog(pub Vec<LogEntry>);
 
 #[derive(Resource, Default, Debug)]
 pub struct LastRawByLane(pub HashMap<usize, RawInput>);
-
-#[derive(Resource)]
-pub struct KeyToActionResource(pub Box<dyn KeyToAction>);
