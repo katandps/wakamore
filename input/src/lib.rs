@@ -1,8 +1,8 @@
 //! input: key polling and conversion to `common::InputEvent`.
 
 use bevy::prelude::*;
-use common::{InputEvent, StateId};
-use std::collections::{HashMap, HashSet};
+use common::InputEvent;
+use std::collections::HashMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ActionBinding {
@@ -128,20 +128,28 @@ impl Bindings {
         Self::from_toml_str(DEFAULT_BINDINGS_TOML).expect("default bindings TOML must be valid")
     }
 
-    fn state_bindings(&self, id: StateId) -> &StateBindings {
-        match id {
-            StateId::Title => &self.title,
-            StateId::Playing => &self.playing,
-            StateId::Result => &self.result,
-        }
+    fn title_bindings(&self) -> &StateBindings {
+        &self.title
     }
 
-    fn state_bindings_mut(&mut self, id: StateId) -> &mut StateBindings {
-        match id {
-            StateId::Title => &mut self.title,
-            StateId::Playing => &mut self.playing,
-            StateId::Result => &mut self.result,
-        }
+    fn title_bindings_mut(&mut self) -> &mut StateBindings {
+        &mut self.title
+    }
+
+    fn playing_bindings(&self) -> &StateBindings {
+        &self.playing
+    }
+
+    fn playing_bindings_mut(&mut self) -> &mut StateBindings {
+        &mut self.playing
+    }
+
+    fn result_bindings(&self) -> &StateBindings {
+        &self.result
+    }
+
+    fn result_bindings_mut(&mut self) -> &mut StateBindings {
+        &mut self.result
     }
 }
 
@@ -171,7 +179,7 @@ impl Bindings {
         parse_state_section(&v, "title", "actions", |key, mapped| {
             if let Some(action) = parse_input_action(mapped) {
                 bindings
-                    .state_bindings_mut(StateId::Title)
+                    .title_bindings_mut()
                     .bind(key, KeyBinding::Action(action));
             } else {
                 eprintln!("unknown action '{}', skipping", mapped);
@@ -181,7 +189,7 @@ impl Bindings {
         parse_state_section(&v, "playing", "actions", |key, mapped| {
             if let Some(action) = parse_input_action(mapped) {
                 bindings
-                    .state_bindings_mut(StateId::Playing)
+                    .playing_bindings_mut()
                     .bind(key, KeyBinding::Action(action));
             } else {
                 eprintln!("unknown action '{}', skipping", mapped);
@@ -191,7 +199,7 @@ impl Bindings {
         parse_state_section(&v, "result", "actions", |key, mapped| {
             if let Some(action) = parse_input_action(mapped) {
                 bindings
-                    .state_bindings_mut(StateId::Result)
+                    .result_bindings_mut()
                     .bind(key, KeyBinding::Action(action));
             } else {
                 eprintln!("unknown action '{}', skipping", mapped);
@@ -201,7 +209,7 @@ impl Bindings {
         parse_state_section(&v, "playing", "play_keys", |key, mapped| {
             if let Some(play_key) = parse_play_key(mapped) {
                 bindings
-                    .state_bindings_mut(StateId::Playing)
+                    .playing_bindings_mut()
                     .bind(key, KeyBinding::Play(play_key));
             } else {
                 eprintln!("unknown play key '{}', skipping", mapped);
@@ -211,7 +219,7 @@ impl Bindings {
         parse_state_section(&v, "playing", "scratch_keys", |key, mapped| {
             if parse_scratch_key(mapped) {
                 bindings
-                    .state_bindings_mut(StateId::Playing)
+                    .playing_bindings_mut()
                     .bind(key, KeyBinding::Scratch);
             } else {
                 eprintln!("unknown scratch key '{}', skipping", mapped);
@@ -221,7 +229,7 @@ impl Bindings {
         parse_state_section(&v, "result", "scratch_keys", |key, mapped| {
             if parse_scratch_key(mapped) {
                 bindings
-                    .state_bindings_mut(StateId::Result)
+                    .result_bindings_mut()
                     .bind(key, KeyBinding::Scratch);
             } else {
                 eprintln!("unknown scratch key '{}', skipping", mapped);
@@ -338,19 +346,12 @@ fn parse_keycode(s: &str) -> Option<KeyCode> {
     }
 }
 
-fn poll_key_events_for_state(
-    state: StateId,
+fn poll_key_events_for_bindings(
+    state_bindings: &StateBindings,
     keys: Res<ButtonInput<KeyCode>>,
     mut ev_writer: MessageWriter<NormalizedInputEvent>,
-    bindings: Res<Bindings>,
 ) {
-    let state_bindings = bindings.state_bindings(state);
-    let mut tracked = HashSet::new();
-    for k in state_bindings.keys() {
-        tracked.insert(k);
-    }
-
-    for key in tracked {
+    for key in state_bindings.keys() {
         if keys.just_pressed(key) {
             for ev in state_bindings.pressed_events(key) {
                 ev_writer.write(ev);
@@ -369,7 +370,7 @@ pub fn poll_title_key_events(
     ev_writer: MessageWriter<NormalizedInputEvent>,
     bindings: Res<Bindings>,
 ) {
-    poll_key_events_for_state(StateId::Title, keys, ev_writer, bindings);
+    poll_key_events_for_bindings(bindings.title_bindings(), keys, ev_writer);
 }
 
 pub fn poll_playing_key_events(
@@ -377,7 +378,7 @@ pub fn poll_playing_key_events(
     ev_writer: MessageWriter<NormalizedInputEvent>,
     bindings: Res<Bindings>,
 ) {
-    poll_key_events_for_state(StateId::Playing, keys, ev_writer, bindings);
+    poll_key_events_for_bindings(bindings.playing_bindings(), keys, ev_writer);
 }
 
 pub fn poll_result_key_events(
@@ -385,7 +386,7 @@ pub fn poll_result_key_events(
     ev_writer: MessageWriter<NormalizedInputEvent>,
     bindings: Res<Bindings>,
 ) {
-    poll_key_events_for_state(StateId::Result, keys, ev_writer, bindings);
+    poll_key_events_for_bindings(bindings.result_bindings(), keys, ev_writer);
 }
 
 #[cfg(test)]
@@ -425,27 +426,27 @@ Space = "Scratch"
 
         let b = Bindings::from_file(&path)?;
         let title_enter = b
-            .state_bindings(StateId::Title)
+            .title_bindings()
             .pressed_events(bevy::prelude::KeyCode::Enter);
         assert_eq!(title_enter, vec![NormalizedInputEvent::Confirm]);
 
         let playing_s_pressed = b
-            .state_bindings(StateId::Playing)
+            .playing_bindings()
             .pressed_events(bevy::prelude::KeyCode::KeyS);
         assert_eq!(playing_s_pressed, vec![NormalizedInputEvent::PlayKeyDown(PlayBinding::Key1)]);
 
         let playing_s_released = b
-            .state_bindings(StateId::Playing)
+            .playing_bindings()
             .released_events(bevy::prelude::KeyCode::KeyS);
         assert_eq!(playing_s_released, vec![NormalizedInputEvent::PlayKeyUp(PlayBinding::Key1)]);
 
         let result_space_pressed = b
-            .state_bindings(StateId::Result)
+            .result_bindings()
             .pressed_events(bevy::prelude::KeyCode::Space);
         assert_eq!(result_space_pressed, vec![NormalizedInputEvent::ScratchDown]);
 
         let result_space_released = b
-            .state_bindings(StateId::Result)
+            .result_bindings()
             .released_events(bevy::prelude::KeyCode::Space);
         assert_eq!(result_space_released, vec![NormalizedInputEvent::ScratchUp]);
 
