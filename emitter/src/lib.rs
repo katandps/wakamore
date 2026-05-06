@@ -1,51 +1,23 @@
 //! emitter: adapters that turn `InputEvent` into runtime events.
 
 use bevy::prelude::*;
-use common::{InputEvent, LaneInputEvent, LastRawByLane, PlayKey, RawInput, ScratchKey};
+use common::{InputEvent, LaneInputEvent, LastRawByLane, RawInput};
 
-fn play_key_to_lane(play_key: PlayKey) -> usize {
-    play_key.lane_index()
+pub trait LaneEventSource: InputEvent {
+    fn lane_input(&self) -> Option<(usize, bool)>;
 }
 
-fn scratch_key_to_lane(scratch_key: ScratchKey) -> usize {
-    scratch_key.lane_index()
-}
-
-pub fn input_events_to_lane_events(
-    mut input_reader: MessageReader<InputEvent>,
+pub fn input_events_to_lane_events<E: LaneEventSource>(
+    mut input_reader: MessageReader<E>,
     mut lane_writer: MessageWriter<LaneInputEvent>,
 ) {
     for ev in input_reader.read() {
-        match ev {
-            InputEvent::PlayKeyDown(play_key) => {
-                lane_writer.write(LaneInputEvent {
-                    lane_index: play_key_to_lane(*play_key),
-                    pressed: true,
-                    raw: None,
-                });
-            }
-            InputEvent::PlayKeyUp(play_key) => {
-                lane_writer.write(LaneInputEvent {
-                    lane_index: play_key_to_lane(*play_key),
-                    pressed: false,
-                    raw: None,
-                });
-            }
-            InputEvent::ScratchDown(scratch_key) => {
-                lane_writer.write(LaneInputEvent {
-                    lane_index: scratch_key_to_lane(*scratch_key),
-                    pressed: true,
-                    raw: None,
-                });
-            }
-            InputEvent::ScratchUp(scratch_key) => {
-                lane_writer.write(LaneInputEvent {
-                    lane_index: scratch_key_to_lane(*scratch_key),
-                    pressed: false,
-                    raw: None,
-                });
-            }
-            _ => {}
+        if let Some((lane_index, pressed)) = ev.lane_input() {
+            lane_writer.write(LaneInputEvent {
+                lane_index,
+                pressed,
+                raw: None,
+            });
         }
     }
 }
@@ -100,14 +72,30 @@ pub fn record_lane_raw_events(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common::InputEvent;
+
+    #[derive(Event, Message, Clone)]
+    enum TestInputEvent {
+        Lane0Down,
+        Lane0Up,
+    }
+
+    impl InputEvent for TestInputEvent {}
+
+    impl LaneEventSource for TestInputEvent {
+        fn lane_input(&self) -> Option<(usize, bool)> {
+            match self {
+                TestInputEvent::Lane0Down => Some((0, true)),
+                TestInputEvent::Lane0Up => Some((0, false)),
+            }
+        }
+    }
 
     #[derive(Resource, Default)]
     struct Out(pub Vec<LaneInputEvent>);
 
-    fn emit_input(mut writer: MessageWriter<InputEvent>) {
-        writer.write(InputEvent::PlayKeyDown(PlayKey::Key1));
-        writer.write(InputEvent::PlayKeyUp(PlayKey::Key1));
+    fn emit_input(mut writer: MessageWriter<TestInputEvent>) {
+        writer.write(TestInputEvent::Lane0Down);
+        writer.write(TestInputEvent::Lane0Up);
     }
 
     fn collect(mut reader: MessageReader<LaneInputEvent>, mut out: ResMut<Out>) {
@@ -119,11 +107,14 @@ mod tests {
     #[test]
     fn input_events_convert_to_lane_events() {
         let mut app = App::new();
-        app.add_message::<InputEvent>();
+        app.add_message::<TestInputEvent>();
         app.add_message::<LaneInputEvent>();
         app.init_resource::<Out>();
         app.add_systems(Startup, emit_input);
-        app.add_systems(Update, (input_events_to_lane_events, collect));
+        app.add_systems(
+            Update,
+            (input_events_to_lane_events::<TestInputEvent>, collect),
+        );
 
         // Run update cycles to ensure startup and message propagation
         app.update();

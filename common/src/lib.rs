@@ -4,60 +4,7 @@ use bevy::prelude::*;
 
 pub use bevy::prelude::KeyCode;
 
-#[derive(Event, Message, Clone, Debug, PartialEq, Eq)]
-pub enum InputAction {
-    Confirm,
-    Cancel,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum PlayKey {
-    Key1,
-    Key2,
-    Key3,
-    Key4,
-    Key5,
-    Key6,
-    Key7,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ScratchKey {
-    Scratch,
-}
-
-impl PlayKey {
-    pub fn lane_index(self) -> usize {
-        match self {
-            PlayKey::Key1 => 0,
-            PlayKey::Key2 => 1,
-            PlayKey::Key3 => 2,
-            PlayKey::Key4 => 4,
-            PlayKey::Key5 => 5,
-            PlayKey::Key6 => 6,
-            PlayKey::Key7 => 7,
-        }
-    }
-}
-
-impl ScratchKey {
-    pub fn lane_index(self) -> usize {
-        3
-    }
-}
-
-#[derive(Event, Message, Clone, Debug, PartialEq, Eq)]
-pub enum InputEvent {
-    PlayKeyDown(PlayKey),
-    PlayKeyUp(PlayKey),
-    ScratchDown(ScratchKey),
-    ScratchUp(ScratchKey),
-    Action(InputAction),
-}
-
-pub trait InputSink: Send + Sync {
-    fn send(&self, ev: InputEvent);
-}
+pub trait InputEvent: Message + Send + Sync + 'static {}
 
 #[derive(Clone, Debug)]
 pub enum RawInput {

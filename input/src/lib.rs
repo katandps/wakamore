@@ -1,8 +1,67 @@
 //! input: key polling and conversion to `common::InputEvent`.
 
 use bevy::prelude::*;
-use common::{InputAction, InputEvent, PlayKey, ScratchKey};
+use common::InputEvent;
 use std::collections::{HashMap, HashSet};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ActionBinding {
+    Confirm,
+    Cancel,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum PlayBinding {
+    Key1,
+    Key2,
+    Key3,
+    Key4,
+    Key5,
+    Key6,
+    Key7,
+}
+
+#[derive(Event, Message, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NormalizedInputEvent {
+    PlayKeyDown(PlayBinding),
+    PlayKeyUp(PlayBinding),
+    ScratchDown,
+    ScratchUp,
+    Confirm,
+    Cancel,
+}
+
+impl InputEvent for NormalizedInputEvent {}
+
+impl Bindings {
+    pub fn pressed_events(&self, key: KeyCode) -> Vec<NormalizedInputEvent> {
+        let mut out = Vec::new();
+        if let Some(play_key) = self.play_key_for_key(key) {
+            out.push(NormalizedInputEvent::PlayKeyDown(play_key));
+        }
+        if self.scratch_key_for_key(key) {
+            out.push(NormalizedInputEvent::ScratchDown);
+        }
+        if let Some(action) = self.action_for_key(key) {
+            match action {
+                ActionBinding::Confirm => out.push(NormalizedInputEvent::Confirm),
+                ActionBinding::Cancel => out.push(NormalizedInputEvent::Cancel),
+            }
+        }
+        out
+    }
+
+    pub fn released_events(&self, key: KeyCode) -> Vec<NormalizedInputEvent> {
+        let mut out = Vec::new();
+        if let Some(play_key) = self.play_key_for_key(key) {
+            out.push(NormalizedInputEvent::PlayKeyUp(play_key));
+        }
+        if self.scratch_key_for_key(key) {
+            out.push(NormalizedInputEvent::ScratchUp);
+        }
+        out
+    }
+}
 
 const DEFAULT_BINDINGS_TOML: &str = r#"
 [play_keys]
@@ -24,9 +83,9 @@ Escape = "Cancel"
 
 #[derive(Resource, Debug, Default)]
 pub struct Bindings {
-    action_by_key: HashMap<KeyCode, InputAction>,
-    play_key_by_key: HashMap<KeyCode, PlayKey>,
-    scratch_key_by_key: HashMap<KeyCode, ScratchKey>,
+    action_by_key: HashMap<KeyCode, ActionBinding>,
+    play_key_by_key: HashMap<KeyCode, PlayBinding>,
+    scratch_key_by_key: HashSet<KeyCode>,
 }
 
 impl Bindings {
@@ -39,20 +98,20 @@ impl Bindings {
         self.action_by_key
             .keys()
             .chain(self.play_key_by_key.keys())
-            .chain(self.scratch_key_by_key.keys())
+            .chain(self.scratch_key_by_key.iter())
             .copied()
     }
 
-    pub fn action_for_key(&self, key: KeyCode) -> Option<InputAction> {
+    fn action_for_key(&self, key: KeyCode) -> Option<ActionBinding> {
         self.action_by_key.get(&key).cloned()
     }
 
-    pub fn play_key_for_key(&self, key: KeyCode) -> Option<PlayKey> {
+    fn play_key_for_key(&self, key: KeyCode) -> Option<PlayBinding> {
         self.play_key_by_key.get(&key).copied()
     }
 
-    pub fn scratch_key_for_key(&self, key: KeyCode) -> Option<ScratchKey> {
-        self.scratch_key_by_key.get(&key).copied()
+    fn scratch_key_for_key(&self, key: KeyCode) -> bool {
+        self.scratch_key_by_key.contains(&key)
     }
 }
 
@@ -96,8 +155,8 @@ impl Bindings {
         });
 
         parse_section(&v, "scratch_keys", |key, mapped| {
-            if let Some(scratch_key) = parse_scratch_key(mapped) {
-                bindings.scratch_key_by_key.insert(key, scratch_key);
+            if parse_scratch_key(mapped) {
+                bindings.scratch_key_by_key.insert(key);
             } else {
                 eprintln!("unknown scratch key '{}', skipping", mapped);
             }
@@ -127,31 +186,31 @@ where
     }
 }
 
-fn parse_input_action(s: &str) -> Option<InputAction> {
+fn parse_input_action(s: &str) -> Option<ActionBinding> {
     match s {
-        "Confirm" | "confirm" => Some(InputAction::Confirm),
-        "Cancel" | "cancel" => Some(InputAction::Cancel),
+        "Confirm" | "confirm" => Some(ActionBinding::Confirm),
+        "Cancel" | "cancel" => Some(ActionBinding::Cancel),
         _ => None,
     }
 }
 
-fn parse_play_key(s: &str) -> Option<PlayKey> {
+fn parse_play_key(s: &str) -> Option<PlayBinding> {
     match s {
-        "Key1" | "1" => Some(PlayKey::Key1),
-        "Key2" | "2" => Some(PlayKey::Key2),
-        "Key3" | "3" => Some(PlayKey::Key3),
-        "Key4" | "4" => Some(PlayKey::Key4),
-        "Key5" | "5" => Some(PlayKey::Key5),
-        "Key6" | "6" => Some(PlayKey::Key6),
-        "Key7" | "7" => Some(PlayKey::Key7),
+        "Key1" | "1" => Some(PlayBinding::Key1),
+        "Key2" | "2" => Some(PlayBinding::Key2),
+        "Key3" | "3" => Some(PlayBinding::Key3),
+        "Key4" | "4" => Some(PlayBinding::Key4),
+        "Key5" | "5" => Some(PlayBinding::Key5),
+        "Key6" | "6" => Some(PlayBinding::Key6),
+        "Key7" | "7" => Some(PlayBinding::Key7),
         _ => None,
     }
 }
 
-fn parse_scratch_key(s: &str) -> Option<ScratchKey> {
+fn parse_scratch_key(s: &str) -> bool {
     match s {
-        "Scratch" | "scratch" => Some(ScratchKey::Scratch),
-        _ => None,
+        "Scratch" | "scratch" => true,
+        _ => false,
     }
 }
 
@@ -212,7 +271,7 @@ fn parse_keycode(s: &str) -> Option<KeyCode> {
 
 pub fn poll_key_events(
     keys: Res<ButtonInput<KeyCode>>,
-    mut ev_writer: MessageWriter<InputEvent>,
+    mut ev_writer: MessageWriter<NormalizedInputEvent>,
     bindings: Res<Bindings>,
 ) {
     let mut tracked = HashSet::new();
@@ -222,22 +281,13 @@ pub fn poll_key_events(
 
     for key in tracked {
         if keys.just_pressed(key) {
-            if let Some(play_key) = bindings.play_key_for_key(key) {
-                ev_writer.write(InputEvent::PlayKeyDown(play_key));
-            }
-            if let Some(scratch_key) = bindings.scratch_key_for_key(key) {
-                ev_writer.write(InputEvent::ScratchDown(scratch_key));
-            }
-            if let Some(action) = bindings.action_for_key(key) {
-                ev_writer.write(InputEvent::Action(action));
+            for ev in bindings.pressed_events(key) {
+                ev_writer.write(ev);
             }
         }
         if keys.just_released(key) {
-            if let Some(play_key) = bindings.play_key_for_key(key) {
-                ev_writer.write(InputEvent::PlayKeyUp(play_key));
-            }
-            if let Some(scratch_key) = bindings.scratch_key_for_key(key) {
-                ev_writer.write(InputEvent::ScratchUp(scratch_key));
+            for ev in bindings.released_events(key) {
+                ev_writer.write(ev);
             }
         }
     }
@@ -271,24 +321,21 @@ Space = "Scratch"
         let b = Bindings::from_file(&path)?;
         assert_eq!(
             b.action_for_key(bevy::prelude::KeyCode::Enter),
-            Some(InputAction::Confirm)
+            Some(ActionBinding::Confirm)
         );
         assert_eq!(
             b.action_for_key(bevy::prelude::KeyCode::Escape),
-            Some(InputAction::Cancel)
+            Some(ActionBinding::Cancel)
         );
         assert_eq!(
             b.play_key_for_key(bevy::prelude::KeyCode::KeyS),
-            Some(PlayKey::Key1)
+            Some(PlayBinding::Key1)
         );
         assert_eq!(
             b.play_key_for_key(bevy::prelude::KeyCode::KeyJ),
-            Some(PlayKey::Key4)
+            Some(PlayBinding::Key4)
         );
-        assert_eq!(
-            b.scratch_key_for_key(bevy::prelude::KeyCode::Space),
-            Some(ScratchKey::Scratch)
-        );
+        assert!(b.scratch_key_for_key(bevy::prelude::KeyCode::Space));
 
         let _ = std::fs::remove_file(&path);
         Ok(())

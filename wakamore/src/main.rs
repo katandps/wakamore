@@ -13,10 +13,14 @@ use emitter::{
 use input::poll_key_events;
 use resource::note::{NoteChart, ScoreSummary};
 use state::{
-    AppState, cleanup_playing, cleanup_result, cleanup_title, update_playing_input,
-    update_result_input, update_title_input,
+    AppState, PlayingInputEvent, ResultInputEvent, TitleInputEvent, cleanup_playing,
+    cleanup_result, cleanup_title, map_playing_input_events, map_result_input_events,
+    map_title_input_events, update_playing_input, update_result_input, update_title_input,
 };
 use system::input_log::record_judgement_to_log;
+use system::key_event_log::{
+    KeyEventLog, record_key_events, setup_key_event_log_ui, update_key_event_log_ui,
+};
 use system::note_animate::animate_note;
 use system::note_judge::evaluate_lane_judgement;
 use system::note_spawn::{
@@ -65,12 +69,16 @@ fn main() {
         .init_resource::<FpsHistory>()
         .insert_resource(initial_bindings)
         .init_resource::<common::InputLog>()
+        .init_resource::<KeyEventLog>()
         .init_resource::<common::LastRawByLane>()
         .init_resource::<component::ChartPlayback>()
         .insert_resource(NoteChart::demo())
         .init_resource::<ScoreSummary>()
         .add_message::<common::LaneInputEvent>()
-        .add_message::<common::InputEvent>()
+        .add_message::<input::NormalizedInputEvent>()
+        .add_message::<TitleInputEvent>()
+        .add_message::<PlayingInputEvent>()
+        .add_message::<ResultInputEvent>()
         .add_message::<common::LaneJudgementEvent>()
         .configure_sets(
             Update,
@@ -86,8 +94,41 @@ fn main() {
             )
                 .chain(),
         )
-        .add_systems(Startup, setup_fps)
-        .add_systems(Update, update_title_input.run_if(in_state(AppState::Title)))
+        .add_systems(Startup, (setup_fps, setup_key_event_log_ui))
+        .add_systems(Update, update_key_event_log_ui)
+        .add_systems(
+            Update,
+            (
+                poll_key_events,
+                map_title_input_events,
+                record_key_events::<TitleInputEvent>,
+                update_title_input,
+            )
+                .chain()
+                .run_if(in_state(AppState::Title)),
+        )
+        .add_systems(
+            Update,
+            (
+                poll_key_events,
+                map_playing_input_events,
+                record_key_events::<PlayingInputEvent>,
+                update_playing_input,
+            )
+                .chain()
+                .run_if(in_state(AppState::Playing)),
+        )
+        .add_systems(
+            Update,
+            (
+                poll_key_events,
+                map_result_input_events,
+                record_key_events::<ResultInputEvent>,
+                update_result_input,
+            )
+                .chain()
+                .run_if(in_state(AppState::Result)),
+        )
         .add_systems(OnExit(AppState::Title), cleanup_title)
         .add_systems(
             OnEnter(AppState::Playing),
@@ -96,9 +137,8 @@ fn main() {
         .add_systems(
             Update,
             (
-                poll_key_events,
                 emit_gamepad_button_lane_input,
-                input_events_to_lane_events,
+                input_events_to_lane_events::<PlayingInputEvent>,
                 record_lane_raw_events,
             )
                 .chain()
@@ -131,15 +171,7 @@ fn main() {
                 .run_if(in_state(AppState::Playing)),
         )
         .add_systems(Update, update_fps_text)
-        .add_systems(
-            Update,
-            update_playing_input.run_if(in_state(AppState::Playing)),
-        )
         .add_systems(OnExit(AppState::Playing), cleanup_playing)
-        .add_systems(
-            Update,
-            update_result_input.run_if(in_state(AppState::Result)),
-        )
         .add_systems(OnExit(AppState::Result), cleanup_result)
         .run();
 }
