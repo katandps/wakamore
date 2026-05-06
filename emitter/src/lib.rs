@@ -21,11 +21,11 @@ fn play_key_to_lane(key: PlayBinding) -> usize {
         PlayBinding::Key1 => 0,
         PlayBinding::Key2 => 1,
         PlayBinding::Key3 => 2,
-        PlayBinding::Key4 => 4,
-        PlayBinding::Key5 => 5,
-        PlayBinding::Key6 => 6,
-        PlayBinding::Key7 => 7,
-        PlayBinding::ScratchUp | PlayBinding::ScratchDown => 3,
+        PlayBinding::Key4 => 3,
+        PlayBinding::Key5 => 4,
+        PlayBinding::Key6 => 5,
+        PlayBinding::Key7 => 6,
+        PlayBinding::ScratchUp | PlayBinding::ScratchDown => 7,
     }
 }
 
