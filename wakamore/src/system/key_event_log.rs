@@ -73,4 +73,4 @@ pub fn update_key_event_log_ui(
     text.0 = s;
 }
 
-// label is derived from Debug impl of each per-screen event enum.
+// label is derived from Debug impl of each per-state event enum.

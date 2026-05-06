@@ -1,7 +1,7 @@
 //! input: key polling and conversion to `common::InputEvent`.
 
 use bevy::prelude::*;
-use common::{InputEvent, ScreenId};
+use common::{InputEvent, StateId};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,11 +41,11 @@ enum KeyBinding {
 }
 
 #[derive(Debug, Default)]
-struct ScreenBindings {
+struct StateBindings {
     bindings_by_key: HashMap<KeyCode, Vec<KeyBinding>>,
 }
 
-impl ScreenBindings {
+impl StateBindings {
     pub fn keys(&self) -> impl Iterator<Item = KeyCode> + '_ {
         self.bindings_by_key.keys().copied()
     }
@@ -117,9 +117,9 @@ Escape = "Cancel"
 
 #[derive(Resource, Debug, Default)]
 pub struct Bindings {
-    title: ScreenBindings,
-    playing: ScreenBindings,
-    result: ScreenBindings,
+    title: StateBindings,
+    playing: StateBindings,
+    result: StateBindings,
 }
 
 impl Bindings {
@@ -128,19 +128,19 @@ impl Bindings {
         Self::from_toml_str(DEFAULT_BINDINGS_TOML).expect("default bindings TOML must be valid")
     }
 
-    fn screen(&self, id: ScreenId) -> &ScreenBindings {
+    fn state_bindings(&self, id: StateId) -> &StateBindings {
         match id {
-            ScreenId::Title => &self.title,
-            ScreenId::Playing => &self.playing,
-            ScreenId::Result => &self.result,
+            StateId::Title => &self.title,
+            StateId::Playing => &self.playing,
+            StateId::Result => &self.result,
         }
     }
 
-    fn screen_mut(&mut self, id: ScreenId) -> &mut ScreenBindings {
+    fn state_bindings_mut(&mut self, id: StateId) -> &mut StateBindings {
         match id {
-            ScreenId::Title => &mut self.title,
-            ScreenId::Playing => &mut self.playing,
-            ScreenId::Result => &mut self.result,
+            StateId::Title => &mut self.title,
+            StateId::Playing => &mut self.playing,
+            StateId::Result => &mut self.result,
         }
     }
 }
@@ -168,53 +168,61 @@ impl Bindings {
         let v: toml::Value = toml::from_str(&s)?;
         let mut bindings = Self::default();
 
-        parse_screen_section(&v, "title", "actions", |key, mapped| {
-            if let Some(action) = parse_input_action(mapped) {
-                bindings.screen_mut(ScreenId::Title).bind(key, KeyBinding::Action(action));
-            } else {
-                eprintln!("unknown action '{}', skipping", mapped);
-            }
-        });
-
-        parse_screen_section(&v, "playing", "actions", |key, mapped| {
+        parse_state_section(&v, "title", "actions", |key, mapped| {
             if let Some(action) = parse_input_action(mapped) {
                 bindings
-                    .screen_mut(ScreenId::Playing)
+                    .state_bindings_mut(StateId::Title)
                     .bind(key, KeyBinding::Action(action));
             } else {
                 eprintln!("unknown action '{}', skipping", mapped);
             }
         });
 
-        parse_screen_section(&v, "result", "actions", |key, mapped| {
+        parse_state_section(&v, "playing", "actions", |key, mapped| {
             if let Some(action) = parse_input_action(mapped) {
-                bindings.screen_mut(ScreenId::Result).bind(key, KeyBinding::Action(action));
+                bindings
+                    .state_bindings_mut(StateId::Playing)
+                    .bind(key, KeyBinding::Action(action));
             } else {
                 eprintln!("unknown action '{}', skipping", mapped);
             }
         });
 
-        parse_screen_section(&v, "playing", "play_keys", |key, mapped| {
+        parse_state_section(&v, "result", "actions", |key, mapped| {
+            if let Some(action) = parse_input_action(mapped) {
+                bindings
+                    .state_bindings_mut(StateId::Result)
+                    .bind(key, KeyBinding::Action(action));
+            } else {
+                eprintln!("unknown action '{}', skipping", mapped);
+            }
+        });
+
+        parse_state_section(&v, "playing", "play_keys", |key, mapped| {
             if let Some(play_key) = parse_play_key(mapped) {
                 bindings
-                    .screen_mut(ScreenId::Playing)
+                    .state_bindings_mut(StateId::Playing)
                     .bind(key, KeyBinding::Play(play_key));
             } else {
                 eprintln!("unknown play key '{}', skipping", mapped);
             }
         });
 
-        parse_screen_section(&v, "playing", "scratch_keys", |key, mapped| {
+        parse_state_section(&v, "playing", "scratch_keys", |key, mapped| {
             if parse_scratch_key(mapped) {
-                bindings.screen_mut(ScreenId::Playing).bind(key, KeyBinding::Scratch);
+                bindings
+                    .state_bindings_mut(StateId::Playing)
+                    .bind(key, KeyBinding::Scratch);
             } else {
                 eprintln!("unknown scratch key '{}', skipping", mapped);
             }
         });
 
-        parse_screen_section(&v, "result", "scratch_keys", |key, mapped| {
+        parse_state_section(&v, "result", "scratch_keys", |key, mapped| {
             if parse_scratch_key(mapped) {
-                bindings.screen_mut(ScreenId::Result).bind(key, KeyBinding::Scratch);
+                bindings
+                    .state_bindings_mut(StateId::Result)
+                    .bind(key, KeyBinding::Scratch);
             } else {
                 eprintln!("unknown scratch key '{}', skipping", mapped);
             }
@@ -224,14 +232,14 @@ impl Bindings {
     }
 }
 
-fn parse_screen_section<F>(v: &toml::Value, screen: &str, section: &str, mut on_entry: F)
+fn parse_state_section<F>(v: &toml::Value, state: &str, section: &str, mut on_entry: F)
 where
     F: FnMut(KeyCode, &str),
 {
-    let Some(toml::Value::Table(screen_tbl)) = v.get(screen) else {
+    let Some(toml::Value::Table(state_tbl)) = v.get(state) else {
         return;
     };
-    let Some(toml::Value::Table(tbl)) = screen_tbl.get(section) else {
+    let Some(toml::Value::Table(tbl)) = state_tbl.get(section) else {
         return;
     };
     for (k, val) in tbl {
@@ -330,26 +338,26 @@ fn parse_keycode(s: &str) -> Option<KeyCode> {
     }
 }
 
-fn poll_key_events_for_screen(
-    screen: ScreenId,
+fn poll_key_events_for_state(
+    state: StateId,
     keys: Res<ButtonInput<KeyCode>>,
     mut ev_writer: MessageWriter<NormalizedInputEvent>,
     bindings: Res<Bindings>,
 ) {
-    let screen_bindings = bindings.screen(screen);
+    let state_bindings = bindings.state_bindings(state);
     let mut tracked = HashSet::new();
-    for k in screen_bindings.keys() {
+    for k in state_bindings.keys() {
         tracked.insert(k);
     }
 
     for key in tracked {
         if keys.just_pressed(key) {
-            for ev in screen_bindings.pressed_events(key) {
+            for ev in state_bindings.pressed_events(key) {
                 ev_writer.write(ev);
             }
         }
         if keys.just_released(key) {
-            for ev in screen_bindings.released_events(key) {
+            for ev in state_bindings.released_events(key) {
                 ev_writer.write(ev);
             }
         }
@@ -361,7 +369,7 @@ pub fn poll_title_key_events(
     ev_writer: MessageWriter<NormalizedInputEvent>,
     bindings: Res<Bindings>,
 ) {
-    poll_key_events_for_screen(ScreenId::Title, keys, ev_writer, bindings);
+    poll_key_events_for_state(StateId::Title, keys, ev_writer, bindings);
 }
 
 pub fn poll_playing_key_events(
@@ -369,7 +377,7 @@ pub fn poll_playing_key_events(
     ev_writer: MessageWriter<NormalizedInputEvent>,
     bindings: Res<Bindings>,
 ) {
-    poll_key_events_for_screen(ScreenId::Playing, keys, ev_writer, bindings);
+    poll_key_events_for_state(StateId::Playing, keys, ev_writer, bindings);
 }
 
 pub fn poll_result_key_events(
@@ -377,7 +385,7 @@ pub fn poll_result_key_events(
     ev_writer: MessageWriter<NormalizedInputEvent>,
     bindings: Res<Bindings>,
 ) {
-    poll_key_events_for_screen(ScreenId::Result, keys, ev_writer, bindings);
+    poll_key_events_for_state(StateId::Result, keys, ev_writer, bindings);
 }
 
 #[cfg(test)]
@@ -416,26 +424,28 @@ Space = "Scratch"
         std::fs::write(&path, toml)?;
 
         let b = Bindings::from_file(&path)?;
-        let title_enter = b.screen(ScreenId::Title).pressed_events(bevy::prelude::KeyCode::Enter);
+        let title_enter = b
+            .state_bindings(StateId::Title)
+            .pressed_events(bevy::prelude::KeyCode::Enter);
         assert_eq!(title_enter, vec![NormalizedInputEvent::Confirm]);
 
         let playing_s_pressed = b
-            .screen(ScreenId::Playing)
+            .state_bindings(StateId::Playing)
             .pressed_events(bevy::prelude::KeyCode::KeyS);
         assert_eq!(playing_s_pressed, vec![NormalizedInputEvent::PlayKeyDown(PlayBinding::Key1)]);
 
         let playing_s_released = b
-            .screen(ScreenId::Playing)
+            .state_bindings(StateId::Playing)
             .released_events(bevy::prelude::KeyCode::KeyS);
         assert_eq!(playing_s_released, vec![NormalizedInputEvent::PlayKeyUp(PlayBinding::Key1)]);
 
         let result_space_pressed = b
-            .screen(ScreenId::Result)
+            .state_bindings(StateId::Result)
             .pressed_events(bevy::prelude::KeyCode::Space);
         assert_eq!(result_space_pressed, vec![NormalizedInputEvent::ScratchDown]);
 
         let result_space_released = b
-            .screen(ScreenId::Result)
+            .state_bindings(StateId::Result)
             .released_events(bevy::prelude::KeyCode::Space);
         assert_eq!(result_space_released, vec![NormalizedInputEvent::ScratchUp]);
 
