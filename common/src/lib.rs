@@ -6,6 +6,13 @@ pub use bevy::prelude::KeyCode;
 
 pub trait InputEvent: Message + Send + Sync + 'static {}
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ScreenId {
+    Title,
+    Playing,
+    Result,
+}
+
 #[derive(Clone, Debug)]
 pub enum RawInput {
     Key(KeyCode),

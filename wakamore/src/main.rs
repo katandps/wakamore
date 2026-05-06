@@ -10,7 +10,7 @@ use component::fps::{FpsHistory, setup_fps, update_fps_text};
 use emitter::{
     emit_gamepad_button_lane_input, input_events_to_lane_events, record_lane_raw_events,
 };
-use input::poll_key_events;
+use input::{poll_playing_key_events, poll_result_key_events, poll_title_key_events};
 use resource::note::{NoteChart, ScoreSummary};
 use state::{
     AppState, PlayingInputEvent, ResultInputEvent, TitleInputEvent, cleanup_playing,
@@ -99,7 +99,7 @@ fn main() {
         .add_systems(
             Update,
             (
-                poll_key_events,
+                poll_title_key_events,
                 map_title_input_events,
                 record_key_events::<TitleInputEvent>,
                 update_title_input,
@@ -110,7 +110,7 @@ fn main() {
         .add_systems(
             Update,
             (
-                poll_key_events,
+                poll_playing_key_events,
                 map_playing_input_events,
                 record_key_events::<PlayingInputEvent>,
                 update_playing_input,
@@ -121,7 +121,7 @@ fn main() {
         .add_systems(
             Update,
             (
-                poll_key_events,
+                poll_result_key_events,
                 map_result_input_events,
                 record_key_events::<ResultInputEvent>,
                 update_result_input,

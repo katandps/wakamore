@@ -1,0 +1,26 @@
+[title.actions]
+Enter = "Confirm"
+Escape = "Cancel"
+
+[playing.play_keys]
+S = "Key1"
+D = "Key2"
+F = "Key3"
+J = "Key4"
+K = "Key5"
+L = "Key6"
+ShiftLeft = "Key7"
+
+[playing.scratch_keys]
+Space = "Scratch"
+
+[playing.actions]
+Enter = "Confirm"
+Escape = "Cancel"
+
+[result.scratch_keys]
+Space = "Scratch"
+
+[result.actions]
+Enter = "Confirm"
+Escape = "Cancel"

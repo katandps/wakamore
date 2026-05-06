@@ -46,9 +46,15 @@ cargo check
 cargo run --package wakamore
 ```
 
+キーバインド設定:
+
+- ルートの `bindings.toml` で画面ごとに設定します。
+- 例: `[title.actions]`, `[playing.play_keys]`, `[result.actions]`
+- `playing` だけがレーン入力 (`play_keys` / `scratch_keys`) を使い、`title` / `result` は主に `actions` を使います。
+
 システムの連携:
 
-- `input::poll_key_events` — キーのポーリングを `common::InputEvent` に書き込む Bevy system
+- `input::poll_title_key_events` / `input::poll_playing_key_events` / `input::poll_result_key_events` — 画面ごとのキーバインド設定を使って入力イベントを発行する Bevy system
 - `emitter::input_events_to_lane_events` — `InputEvent` を `LaneInputEvent` に変換して発行
 - `emitter::emit_gamepad_button_lane_input` — ゲームパッド入力を lane イベントに変換
 

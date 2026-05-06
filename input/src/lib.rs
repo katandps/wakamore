@@ -1,7 +1,7 @@
 //! input: key polling and conversion to `common::InputEvent`.
 
 use bevy::prelude::*;
-use common::InputEvent;
+use common::{InputEvent, ScreenId};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,19 +33,39 @@ pub enum NormalizedInputEvent {
 
 impl InputEvent for NormalizedInputEvent {}
 
-impl Bindings {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum KeyBinding {
+    Action(ActionBinding),
+    Play(PlayBinding),
+    Scratch,
+}
+
+#[derive(Debug, Default)]
+struct ScreenBindings {
+    bindings_by_key: HashMap<KeyCode, Vec<KeyBinding>>,
+}
+
+impl ScreenBindings {
+    pub fn keys(&self) -> impl Iterator<Item = KeyCode> + '_ {
+        self.bindings_by_key.keys().copied()
+    }
+
+    fn bind(&mut self, key: KeyCode, binding: KeyBinding) {
+        self.bindings_by_key.entry(key).or_default().push(binding);
+    }
+
     pub fn pressed_events(&self, key: KeyCode) -> Vec<NormalizedInputEvent> {
         let mut out = Vec::new();
-        if let Some(play_key) = self.play_key_for_key(key) {
-            out.push(NormalizedInputEvent::PlayKeyDown(play_key));
-        }
-        if self.scratch_key_for_key(key) {
-            out.push(NormalizedInputEvent::ScratchDown);
-        }
-        if let Some(action) = self.action_for_key(key) {
-            match action {
-                ActionBinding::Confirm => out.push(NormalizedInputEvent::Confirm),
-                ActionBinding::Cancel => out.push(NormalizedInputEvent::Cancel),
+        if let Some(bindings) = self.bindings_by_key.get(&key) {
+            for binding in bindings {
+                match binding {
+                    KeyBinding::Action(ActionBinding::Confirm) => {
+                        out.push(NormalizedInputEvent::Confirm)
+                    }
+                    KeyBinding::Action(ActionBinding::Cancel) => out.push(NormalizedInputEvent::Cancel),
+                    KeyBinding::Play(play_key) => out.push(NormalizedInputEvent::PlayKeyDown(*play_key)),
+                    KeyBinding::Scratch => out.push(NormalizedInputEvent::ScratchDown),
+                }
             }
         }
         out
@@ -53,18 +73,21 @@ impl Bindings {
 
     pub fn released_events(&self, key: KeyCode) -> Vec<NormalizedInputEvent> {
         let mut out = Vec::new();
-        if let Some(play_key) = self.play_key_for_key(key) {
-            out.push(NormalizedInputEvent::PlayKeyUp(play_key));
-        }
-        if self.scratch_key_for_key(key) {
-            out.push(NormalizedInputEvent::ScratchUp);
+        if let Some(bindings) = self.bindings_by_key.get(&key) {
+            for binding in bindings {
+                match binding {
+                    KeyBinding::Play(play_key) => out.push(NormalizedInputEvent::PlayKeyUp(*play_key)),
+                    KeyBinding::Scratch => out.push(NormalizedInputEvent::ScratchUp),
+                    KeyBinding::Action(_) => {}
+                }
+            }
         }
         out
     }
 }
 
 const DEFAULT_BINDINGS_TOML: &str = r#"
-[play_keys]
+[playing.play_keys]
 S = "Key1"
 D = "Key2"
 F = "Key3"
@@ -73,19 +96,30 @@ K = "Key5"
 L = "Key6"
 ShiftLeft = "Key7"
 
-[scratch_keys]
+[playing.scratch_keys]
 Space = "Scratch"
 
-[actions]
+[playing.actions]
+Enter = "Confirm"
+Escape = "Cancel"
+
+[title.actions]
+Enter = "Confirm"
+Escape = "Cancel"
+
+[result.scratch_keys]
+Space = "Scratch"
+
+[result.actions]
 Enter = "Confirm"
 Escape = "Cancel"
 "#;
 
 #[derive(Resource, Debug, Default)]
 pub struct Bindings {
-    action_by_key: HashMap<KeyCode, ActionBinding>,
-    play_key_by_key: HashMap<KeyCode, PlayBinding>,
-    scratch_key_by_key: HashSet<KeyCode>,
+    title: ScreenBindings,
+    playing: ScreenBindings,
+    result: ScreenBindings,
 }
 
 impl Bindings {
@@ -94,37 +128,33 @@ impl Bindings {
         Self::from_toml_str(DEFAULT_BINDINGS_TOML).expect("default bindings TOML must be valid")
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = KeyCode> + '_ {
-        self.action_by_key
-            .keys()
-            .chain(self.play_key_by_key.keys())
-            .chain(self.scratch_key_by_key.iter())
-            .copied()
+    fn screen(&self, id: ScreenId) -> &ScreenBindings {
+        match id {
+            ScreenId::Title => &self.title,
+            ScreenId::Playing => &self.playing,
+            ScreenId::Result => &self.result,
+        }
     }
 
-    fn action_for_key(&self, key: KeyCode) -> Option<ActionBinding> {
-        self.action_by_key.get(&key).cloned()
-    }
-
-    fn play_key_for_key(&self, key: KeyCode) -> Option<PlayBinding> {
-        self.play_key_by_key.get(&key).copied()
-    }
-
-    fn scratch_key_for_key(&self, key: KeyCode) -> bool {
-        self.scratch_key_by_key.contains(&key)
+    fn screen_mut(&mut self, id: ScreenId) -> &mut ScreenBindings {
+        match id {
+            ScreenId::Title => &mut self.title,
+            ScreenId::Playing => &mut self.playing,
+            ScreenId::Result => &mut self.result,
+        }
     }
 }
 
 impl Bindings {
     /// Attempt to load bindings from a TOML file at `path`.
     /// Expected format:
-    /// [play_keys]
+    /// [playing.play_keys]
     /// S = "Key1"
     ///
-    /// [scratch_keys]
+    /// [playing.scratch_keys]
     /// Space = "Scratch"
     ///
-    /// [actions]
+    /// [playing.actions]
     /// Enter = "Confirm"
     /// Escape = "Cancel"
     pub fn from_file<P: AsRef<std::path::Path>>(
@@ -138,25 +168,53 @@ impl Bindings {
         let v: toml::Value = toml::from_str(&s)?;
         let mut bindings = Self::default();
 
-        parse_section(&v, "actions", |key, mapped| {
+        parse_screen_section(&v, "title", "actions", |key, mapped| {
             if let Some(action) = parse_input_action(mapped) {
-                bindings.action_by_key.insert(key, action);
+                bindings.screen_mut(ScreenId::Title).bind(key, KeyBinding::Action(action));
             } else {
                 eprintln!("unknown action '{}', skipping", mapped);
             }
         });
 
-        parse_section(&v, "play_keys", |key, mapped| {
+        parse_screen_section(&v, "playing", "actions", |key, mapped| {
+            if let Some(action) = parse_input_action(mapped) {
+                bindings
+                    .screen_mut(ScreenId::Playing)
+                    .bind(key, KeyBinding::Action(action));
+            } else {
+                eprintln!("unknown action '{}', skipping", mapped);
+            }
+        });
+
+        parse_screen_section(&v, "result", "actions", |key, mapped| {
+            if let Some(action) = parse_input_action(mapped) {
+                bindings.screen_mut(ScreenId::Result).bind(key, KeyBinding::Action(action));
+            } else {
+                eprintln!("unknown action '{}', skipping", mapped);
+            }
+        });
+
+        parse_screen_section(&v, "playing", "play_keys", |key, mapped| {
             if let Some(play_key) = parse_play_key(mapped) {
-                bindings.play_key_by_key.insert(key, play_key);
+                bindings
+                    .screen_mut(ScreenId::Playing)
+                    .bind(key, KeyBinding::Play(play_key));
             } else {
                 eprintln!("unknown play key '{}', skipping", mapped);
             }
         });
 
-        parse_section(&v, "scratch_keys", |key, mapped| {
+        parse_screen_section(&v, "playing", "scratch_keys", |key, mapped| {
             if parse_scratch_key(mapped) {
-                bindings.scratch_key_by_key.insert(key);
+                bindings.screen_mut(ScreenId::Playing).bind(key, KeyBinding::Scratch);
+            } else {
+                eprintln!("unknown scratch key '{}', skipping", mapped);
+            }
+        });
+
+        parse_screen_section(&v, "result", "scratch_keys", |key, mapped| {
+            if parse_scratch_key(mapped) {
+                bindings.screen_mut(ScreenId::Result).bind(key, KeyBinding::Scratch);
             } else {
                 eprintln!("unknown scratch key '{}', skipping", mapped);
             }
@@ -166,11 +224,14 @@ impl Bindings {
     }
 }
 
-fn parse_section<F>(v: &toml::Value, name: &str, mut on_entry: F)
+fn parse_screen_section<F>(v: &toml::Value, screen: &str, section: &str, mut on_entry: F)
 where
     F: FnMut(KeyCode, &str),
 {
-    let Some(toml::Value::Table(tbl)) = v.get(name) else {
+    let Some(toml::Value::Table(screen_tbl)) = v.get(screen) else {
+        return;
+    };
+    let Some(toml::Value::Table(tbl)) = screen_tbl.get(section) else {
         return;
     };
     for (k, val) in tbl {
@@ -269,28 +330,54 @@ fn parse_keycode(s: &str) -> Option<KeyCode> {
     }
 }
 
-pub fn poll_key_events(
+fn poll_key_events_for_screen(
+    screen: ScreenId,
     keys: Res<ButtonInput<KeyCode>>,
     mut ev_writer: MessageWriter<NormalizedInputEvent>,
     bindings: Res<Bindings>,
 ) {
+    let screen_bindings = bindings.screen(screen);
     let mut tracked = HashSet::new();
-    for k in bindings.keys() {
+    for k in screen_bindings.keys() {
         tracked.insert(k);
     }
 
     for key in tracked {
         if keys.just_pressed(key) {
-            for ev in bindings.pressed_events(key) {
+            for ev in screen_bindings.pressed_events(key) {
                 ev_writer.write(ev);
             }
         }
         if keys.just_released(key) {
-            for ev in bindings.released_events(key) {
+            for ev in screen_bindings.released_events(key) {
                 ev_writer.write(ev);
             }
         }
     }
+}
+
+pub fn poll_title_key_events(
+    keys: Res<ButtonInput<KeyCode>>,
+    ev_writer: MessageWriter<NormalizedInputEvent>,
+    bindings: Res<Bindings>,
+) {
+    poll_key_events_for_screen(ScreenId::Title, keys, ev_writer, bindings);
+}
+
+pub fn poll_playing_key_events(
+    keys: Res<ButtonInput<KeyCode>>,
+    ev_writer: MessageWriter<NormalizedInputEvent>,
+    bindings: Res<Bindings>,
+) {
+    poll_key_events_for_screen(ScreenId::Playing, keys, ev_writer, bindings);
+}
+
+pub fn poll_result_key_events(
+    keys: Res<ButtonInput<KeyCode>>,
+    ev_writer: MessageWriter<NormalizedInputEvent>,
+    bindings: Res<Bindings>,
+) {
+    poll_key_events_for_screen(ScreenId::Result, keys, ev_writer, bindings);
 }
 
 #[cfg(test)]
@@ -305,37 +392,52 @@ mod tests {
             std::process::id()
         ));
         let toml = r#"
-[actions]
+[title.actions]
 Enter = "Confirm"
 Escape = "Cancel"
 
-[play_keys]
+[playing.actions]
+Enter = "Confirm"
+Escape = "Cancel"
+
+[playing.play_keys]
 S = "Key1"
 J = "Key4"
 
-[scratch_keys]
+[playing.scratch_keys]
+Space = "Scratch"
+
+[result.actions]
+Enter = "Confirm"
+
+[result.scratch_keys]
 Space = "Scratch"
 "#;
         std::fs::write(&path, toml)?;
 
         let b = Bindings::from_file(&path)?;
-        assert_eq!(
-            b.action_for_key(bevy::prelude::KeyCode::Enter),
-            Some(ActionBinding::Confirm)
-        );
-        assert_eq!(
-            b.action_for_key(bevy::prelude::KeyCode::Escape),
-            Some(ActionBinding::Cancel)
-        );
-        assert_eq!(
-            b.play_key_for_key(bevy::prelude::KeyCode::KeyS),
-            Some(PlayBinding::Key1)
-        );
-        assert_eq!(
-            b.play_key_for_key(bevy::prelude::KeyCode::KeyJ),
-            Some(PlayBinding::Key4)
-        );
-        assert!(b.scratch_key_for_key(bevy::prelude::KeyCode::Space));
+        let title_enter = b.screen(ScreenId::Title).pressed_events(bevy::prelude::KeyCode::Enter);
+        assert_eq!(title_enter, vec![NormalizedInputEvent::Confirm]);
+
+        let playing_s_pressed = b
+            .screen(ScreenId::Playing)
+            .pressed_events(bevy::prelude::KeyCode::KeyS);
+        assert_eq!(playing_s_pressed, vec![NormalizedInputEvent::PlayKeyDown(PlayBinding::Key1)]);
+
+        let playing_s_released = b
+            .screen(ScreenId::Playing)
+            .released_events(bevy::prelude::KeyCode::KeyS);
+        assert_eq!(playing_s_released, vec![NormalizedInputEvent::PlayKeyUp(PlayBinding::Key1)]);
+
+        let result_space_pressed = b
+            .screen(ScreenId::Result)
+            .pressed_events(bevy::prelude::KeyCode::Space);
+        assert_eq!(result_space_pressed, vec![NormalizedInputEvent::ScratchDown]);
+
+        let result_space_released = b
+            .screen(ScreenId::Result)
+            .released_events(bevy::prelude::KeyCode::Space);
+        assert_eq!(result_space_released, vec![NormalizedInputEvent::ScratchUp]);
 
         let _ = std::fs::remove_file(&path);
         Ok(())
