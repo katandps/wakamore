@@ -1,22 +1,22 @@
 [title.actions]
-Enter = "Confirm"
-Escape = "Cancel"
+Confirm = "Enter"
+Cancel = "Escape"
 
 [playing.play_keys]
-S = "Key1"
-D = "Key2"
-F = "Key3"
-J = "Key4"
-K = "Key5"
-L = "Key6"
-ShiftLeft = "Key7"
+Key1 = "S"
+Key2 = "D"
+Key3 = "F"
+Key4 = "J"
+Key5 = "K"
+Key6 = "L"
+Key7 = "LShift"
 
 [playing.scratch_up_keys]
-Space = "ScratchUp"
+ScratchUp = "Space"
 
 [playing.scratch_down_keys]
-ShiftRight = "ScratchDown"
+ScratchDown = "RShift"
 
 [result.actions]
-Enter = "Confirm"
-Escape = "Cancel"
+Confirm = "Enter"
+Cancel = "Escape"

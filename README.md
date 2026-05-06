@@ -49,6 +49,7 @@ cargo run --package wakamore
 キーバインド設定:
 
 - ルートの `bindings.toml` で画面ごとに設定します。
+- 記法は「イベント名 = キー名」です（例: `Confirm = "Enter"`, `Key1 = "S"`）。
 - 例: `[title.actions]`, `[playing.play_keys]`, `[result.actions]`
 - `playing` だけがレーン入力 (`play_keys` / `scratch_up_keys` / `scratch_down_keys`) を使い、`title` / `result` は `actions` を使います。
 

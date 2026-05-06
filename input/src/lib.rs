@@ -51,27 +51,27 @@ impl StateBindings {
 
 const DEFAULT_BINDINGS_TOML: &str = r#"
 [playing.play_keys]
-S = "Key1"
-D = "Key2"
-F = "Key3"
-J = "Key4"
-K = "Key5"
-L = "Key6"
-ShiftLeft = "Key7"
+Key1 = "S"
+Key2 = "D"
+Key3 = "F"
+Key4 = "J"
+Key5 = "K"
+Key6 = "L"
+Key7 = "LShift"
 
 [playing.scratch_up_keys]
-Space = "ScratchUp"
+ScratchUp = "Space"
 
 [playing.scratch_down_keys]
-ShiftRight = "ScratchDown"
+ScratchDown = "RShift"
 
 [title.actions]
-Enter = "Confirm"
-Escape = "Cancel"
+Confirm = "Enter"
+Cancel = "Escape"
 
 [result.actions]
-Enter = "Confirm"
-Escape = "Cancel"
+Confirm = "Enter"
+Cancel = "Escape"
 "#;
 
 #[derive(Resource, Debug, Default)]
@@ -116,17 +116,17 @@ impl Bindings {
     /// Attempt to load bindings from a TOML file at `path`.
     /// Expected format:
     /// [playing.play_keys]
-    /// S = "Key1"
+    /// Key1 = "S"
     ///
     /// [playing.scratch_up_keys]
-    /// Space = "ScratchUp"
+    /// ScratchUp = "Space"
     ///
     /// [playing.scratch_down_keys]
-    /// ShiftRight = "ScratchDown"
+    /// ScratchDown = "ShiftRight"
     ///
     /// [result.actions]
-    /// Enter = "Confirm"
-    /// Escape = "Cancel"
+    /// Confirm = "Enter"
+    /// Cancel = "Escape"
     pub fn from_file<P: AsRef<std::path::Path>>(
         path: P,
     ) -> Result<Self, Box<dyn std::error::Error>> {
@@ -138,64 +138,64 @@ impl Bindings {
         let v: toml::Value = toml::from_str(&s)?;
         let mut bindings = Self::default();
 
-        parse_state_section(&v, "title", "actions", |key, mapped| {
-            if let Some(action) = parse_input_action(mapped) {
+        parse_state_event_section(&v, "title", "actions", |event, key| {
+            if let Some(action) = parse_input_action(event) {
                 bindings
                     .title_bindings_mut()
                     .bind(key, KeyBinding::Action(action));
             } else {
-                eprintln!("unknown action '{}', skipping", mapped);
+                eprintln!("unknown action '{}', skipping", event);
             }
         });
 
-        parse_state_section(&v, "result", "actions", |key, mapped| {
-            if let Some(action) = parse_input_action(mapped) {
+        parse_state_event_section(&v, "result", "actions", |event, key| {
+            if let Some(action) = parse_input_action(event) {
                 bindings
                     .result_bindings_mut()
                     .bind(key, KeyBinding::Action(action));
             } else {
-                eprintln!("unknown action '{}', skipping", mapped);
+                eprintln!("unknown action '{}', skipping", event);
             }
         });
 
-        parse_state_section(&v, "playing", "play_keys", |key, mapped| {
-            if let Some(play_key) = parse_play_key(mapped) {
+        parse_state_event_section(&v, "playing", "play_keys", |event, key| {
+            if let Some(play_key) = parse_play_key(event) {
                 bindings
                     .playing_bindings_mut()
                     .bind(key, KeyBinding::Play(play_key));
             } else {
-                eprintln!("unknown play key '{}', skipping", mapped);
+                eprintln!("unknown play key '{}', skipping", event);
             }
         });
 
-        parse_state_section(&v, "playing", "scratch_up_keys", |key, mapped| {
-            if parse_scratch_key(mapped) == Some(KeyBinding::ScratchUp) {
+        parse_state_event_section(&v, "playing", "scratch_up_keys", |event, key| {
+            if parse_scratch_key(event) == Some(KeyBinding::ScratchUp) {
                 bindings
                     .playing_bindings_mut()
                     .bind(key, KeyBinding::ScratchUp);
             } else {
-                eprintln!("unknown scratch key '{}', skipping", mapped);
+                eprintln!("unknown scratch key '{}', skipping", event);
             }
         });
 
-        parse_state_section(&v, "playing", "scratch_down_keys", |key, mapped| {
-            if parse_scratch_key(mapped) == Some(KeyBinding::ScratchDown) {
+        parse_state_event_section(&v, "playing", "scratch_down_keys", |event, key| {
+            if parse_scratch_key(event) == Some(KeyBinding::ScratchDown) {
                 bindings
                     .playing_bindings_mut()
                     .bind(key, KeyBinding::ScratchDown);
             } else {
-                eprintln!("unknown scratch key '{}', skipping", mapped);
+                eprintln!("unknown scratch key '{}', skipping", event);
             }
         });
 
         // backward compatibility: legacy [playing.scratch_keys] means ScratchUp
-        parse_state_section(&v, "playing", "scratch_keys", |key, mapped| {
-            if parse_scratch_key(mapped).is_some() {
+        parse_state_event_section(&v, "playing", "scratch_keys", |event, key| {
+            if parse_scratch_key(event).is_some() {
                 bindings
                     .playing_bindings_mut()
                     .bind(key, KeyBinding::ScratchUp);
             } else {
-                eprintln!("unknown scratch key '{}', skipping", mapped);
+                eprintln!("unknown scratch key '{}', skipping", event);
             }
         });
 
@@ -203,9 +203,9 @@ impl Bindings {
     }
 }
 
-fn parse_state_section<F>(v: &toml::Value, state: &str, section: &str, mut on_entry: F)
+fn parse_state_event_section<F>(v: &toml::Value, state: &str, section: &str, mut on_entry: F)
 where
-    F: FnMut(KeyCode, &str),
+    F: FnMut(&str, KeyCode),
 {
     let Some(toml::Value::Table(state_tbl)) = v.get(state) else {
         return;
@@ -213,16 +213,16 @@ where
     let Some(toml::Value::Table(tbl)) = state_tbl.get(section) else {
         return;
     };
-    for (k, val) in tbl {
-        let Some(keycode) = parse_keycode(k) else {
-            eprintln!("unknown key '{}', skipping", k);
+    for (event, val) in tbl {
+        let toml::Value::String(key_name) = val else {
+            eprintln!("invalid key value for event '{}', skipping", event);
             continue;
         };
-        let toml::Value::String(mapped) = val else {
-            eprintln!("invalid mapped value for key '{}', skipping", k);
+        let Some(keycode) = parse_keycode(key_name) else {
+            eprintln!("unknown key '{}', skipping", key_name);
             continue;
         };
-        on_entry(keycode, mapped);
+        on_entry(event, keycode);
     }
 }
 
@@ -258,55 +258,39 @@ fn parse_scratch_key(s: &str) -> Option<KeyBinding> {
 fn parse_keycode(s: &str) -> Option<KeyCode> {
     use bevy::prelude::KeyCode::*;
     match s.trim() {
-        "KeyS" | "S" => Some(KeyS),
-        "KeyD" | "D" => Some(KeyD),
-        "KeyF" | "F" => Some(KeyF),
-        "Space" | " " => Some(Space),
-        "KeyJ" | "J" => Some(KeyJ),
-        "KeyK" | "K" => Some(KeyK),
-        "KeyL" | "L" => Some(KeyL),
-        "ShiftLeft" | "LeftShift" | "Shift" => Some(ShiftLeft),
-        "ShiftRight" | "RightShift" => Some(ShiftRight),
+        "A" => Some(KeyA),
+        "B" => Some(KeyB),
+        "C" => Some(KeyC),
+        "D" => Some(KeyD),
+        "E" => Some(KeyE),
+        "F" => Some(KeyF),
+        "G" => Some(KeyG),
+        "H" => Some(KeyH),
+        "I" => Some(KeyI),
+        "J" => Some(KeyJ),
+        "K" => Some(KeyK),
+        "L" => Some(KeyL),
+        "M" => Some(KeyM),
+        "N" => Some(KeyN),
+        "O" => Some(KeyO),
+        "P" => Some(KeyP),
+        "Q" => Some(KeyQ),
+        "R" => Some(KeyR),
+        "S" => Some(KeyS),
+        "T" => Some(KeyT),
+        "U" => Some(KeyU),
+        "V" => Some(KeyV),
+        "W" => Some(KeyW),
+        "X" => Some(KeyX),
+        "Y" => Some(KeyY),
+        "Z" => Some(KeyZ),
+        "Space" => Some(Space),
+        "LShift" => Some(ShiftLeft),
+        "RShift" => Some(ShiftRight),
         "Enter" => Some(Enter),
-        "Escape" | "Esc" => Some(Escape),
+        "Escape" => Some(Escape),
         "Tab" => Some(Tab),
-        other => {
-            // Try to parse single character like "a" -> KeyA if needed
-            let up = other.to_uppercase();
-            if up.len() == 1 {
-                match up.as_str() {
-                    "A" => Some(KeyA),
-                    "B" => Some(KeyB),
-                    "C" => Some(KeyC),
-                    "D" => Some(KeyD),
-                    "E" => Some(KeyE),
-                    "F" => Some(KeyF),
-                    "G" => Some(KeyG),
-                    "H" => Some(KeyH),
-                    "I" => Some(KeyI),
-                    "J" => Some(KeyJ),
-                    "K" => Some(KeyK),
-                    "L" => Some(KeyL),
-                    "M" => Some(KeyM),
-                    "N" => Some(KeyN),
-                    "O" => Some(KeyO),
-                    "P" => Some(KeyP),
-                    "Q" => Some(KeyQ),
-                    "R" => Some(KeyR),
-                    "S" => Some(KeyS),
-                    "T" => Some(KeyT),
-                    "U" => Some(KeyU),
-                    "V" => Some(KeyV),
-                    "W" => Some(KeyW),
-                    "X" => Some(KeyX),
-                    "Y" => Some(KeyY),
-                    "Z" => Some(KeyZ),
-                    _ => None,
-                }
-            } else {
-                None
-            }
-        }
+        _ => None,
     }
 }
 
@@ -426,26 +410,22 @@ mod tests {
         ));
         let toml = r#"
 [title.actions]
-Enter = "Confirm"
-Escape = "Cancel"
-
-[playing.actions]
-Enter = "Confirm"
-Escape = "Cancel"
+    Confirm = "Enter"
+    Cancel = "Escape"
 
 [playing.play_keys]
-S = "Key1"
-J = "Key4"
+    Key1 = "S"
+    Key4 = "J"
 
 [playing.scratch_up_keys]
-Space = "ScratchUp"
+    ScratchUp = "Space"
 
 [playing.scratch_down_keys]
-ShiftRight = "ScratchDown"
+    ScratchDown = "RShift"
 
 [result.actions]
-Enter = "Confirm"
-Escape = "Cancel"
+    Confirm = "Enter"
+    Cancel = "Escape"
 "#;
         std::fs::write(&path, toml)?;
 
@@ -473,7 +453,10 @@ Escape = "Cancel"
         let result_space_released = b
             .result_bindings()
             .released_bindings(bevy::prelude::KeyCode::Enter);
-        assert!(result_space_released.is_empty());
+        assert_eq!(
+            result_space_released,
+            vec![KeyBinding::Action(ActionBinding::Confirm)]
+        );
 
         let _ = std::fs::remove_file(&path);
         Ok(())
@@ -482,14 +465,21 @@ Escape = "Cancel"
     #[test]
     fn parse_keycode_accepts_single_letters_and_known_names() {
         assert_eq!(parse_keycode("A"), Some(bevy::prelude::KeyCode::KeyA));
-        assert_eq!(parse_keycode("a"), Some(bevy::prelude::KeyCode::KeyA));
+        assert_eq!(parse_keycode("a"), None);
         assert_eq!(parse_keycode("Space"), Some(bevy::prelude::KeyCode::Space));
+        assert_eq!(parse_keycode(" "), None);
         assert_eq!(parse_keycode("Enter"), Some(bevy::prelude::KeyCode::Enter));
-        assert_eq!(parse_keycode("KeyS"), Some(bevy::prelude::KeyCode::KeyS));
+        assert_eq!(parse_keycode("KeyS"), None);
+        assert_eq!(parse_keycode("Shift"), None);
         assert_eq!(
-            parse_keycode("Shift"),
+            parse_keycode("LShift"),
             Some(bevy::prelude::KeyCode::ShiftLeft)
         );
+        assert_eq!(
+            parse_keycode("RShift"),
+            Some(bevy::prelude::KeyCode::ShiftRight)
+        );
+        assert_eq!(parse_keycode("Esc"), None);
         assert_eq!(parse_keycode("UnknownKey"), None);
     }
 }
