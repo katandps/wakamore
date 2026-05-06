@@ -6,6 +6,45 @@ pub use bevy::prelude::KeyCode;
 
 pub trait InputEvent: Message + Send + Sync + 'static {}
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum PlayBinding {
+    Key1,
+    Key2,
+    Key3,
+    Key4,
+    Key5,
+    Key6,
+    Key7,
+}
+
+#[derive(Event, Message, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TitleInputEvent {
+    Confirm,
+    Cancel,
+}
+
+impl InputEvent for TitleInputEvent {}
+
+#[derive(Event, Message, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlayingInputEvent {
+    PlayKeyDown(PlayBinding),
+    PlayKeyUp(PlayBinding),
+    ScratchUpOn,
+    ScratchUpOff,
+    ScratchDownOn,
+    ScratchDownOff,
+}
+
+impl InputEvent for PlayingInputEvent {}
+
+#[derive(Event, Message, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ResultInputEvent {
+    Confirm,
+    Cancel,
+}
+
+impl InputEvent for ResultInputEvent {}
+
 #[derive(Clone, Debug)]
 pub enum RawInput {
     Key(KeyCode),

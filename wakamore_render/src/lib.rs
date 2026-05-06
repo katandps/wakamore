@@ -185,7 +185,7 @@ pub fn setup_result<T: Resource + ResultSummaryView>(
 ) {
     commands.spawn((
         Text::new(format!(
-            "Result\nScore: {}\nPG: {}  GR: {}  MISS: {}\nPress Enter: Title\nPress Space: Retry",
+            "Result\nScore: {}\nPG: {}  GR: {}  MISS: {}\nPress Enter: Title\nPress Escape: Retry",
             score_summary.score(),
             score_summary.pg(),
             score_summary.gr(),

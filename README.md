@@ -50,7 +50,7 @@ cargo run --package wakamore
 
 - ルートの `bindings.toml` で画面ごとに設定します。
 - 例: `[title.actions]`, `[playing.play_keys]`, `[result.actions]`
-- `playing` だけがレーン入力 (`play_keys` / `scratch_keys`) を使い、`title` / `result` は主に `actions` を使います。
+- `playing` だけがレーン入力 (`play_keys` / `scratch_up_keys` / `scratch_down_keys`) を使い、`title` / `result` は `actions` を使います。
 
 システムの連携:
 

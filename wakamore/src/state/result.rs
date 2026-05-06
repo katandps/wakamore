@@ -1,44 +1,9 @@
 use bevy::prelude::*;
-use common::InputEvent;
-use input::NormalizedInputEvent;
+use common::ResultInputEvent;
 
 use crate::component::ScoreSummary;
 use crate::state::{AppState, ResultEntity};
 use wakamore_render::ResultSummaryView;
-
-#[derive(Event, Message, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ResultInputEvent {
-    ScratchDown,
-    ScratchUp,
-    Confirm,
-    Cancel,
-}
-
-impl InputEvent for ResultInputEvent {
-}
-
-pub fn map_result_input_events(
-    mut in_reader: MessageReader<NormalizedInputEvent>,
-    mut out_writer: MessageWriter<ResultInputEvent>,
-) {
-    for ev in in_reader.read() {
-        match ev {
-            NormalizedInputEvent::ScratchDown => {
-                out_writer.write(ResultInputEvent::ScratchDown);
-            }
-            NormalizedInputEvent::ScratchUp => {
-                out_writer.write(ResultInputEvent::ScratchUp);
-            }
-            NormalizedInputEvent::Confirm => {
-                out_writer.write(ResultInputEvent::Confirm);
-            }
-            NormalizedInputEvent::Cancel => {
-                out_writer.write(ResultInputEvent::Cancel);
-            }
-            _ => {}
-        }
-    }
-}
 
 impl ResultSummaryView for ScoreSummary {
     fn score(&self) -> u32 {
@@ -68,11 +33,10 @@ pub fn update_result_input(
                 next_state.set(AppState::Title);
                 break;
             }
-            ResultInputEvent::ScratchDown => {
+            ResultInputEvent::Cancel => {
                 next_state.set(AppState::Playing);
                 break;
             }
-            _ => {}
         }
     }
 }

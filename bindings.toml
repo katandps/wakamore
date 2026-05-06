@@ -11,15 +11,11 @@ K = "Key5"
 L = "Key6"
 ShiftLeft = "Key7"
 
-[playing.scratch_keys]
-Space = "Scratch"
+[playing.scratch_up_keys]
+Space = "ScratchUp"
 
-[playing.actions]
-Enter = "Confirm"
-Escape = "Cancel"
-
-[result.scratch_keys]
-Space = "Scratch"
+[playing.scratch_down_keys]
+ShiftRight = "ScratchDown"
 
 [result.actions]
 Enter = "Confirm"

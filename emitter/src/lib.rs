@@ -1,10 +1,35 @@
 //! emitter: adapters that turn `InputEvent` into runtime events.
 
 use bevy::prelude::*;
-use common::{InputEvent, LaneInputEvent, LastRawByLane, RawInput};
+use common::{InputEvent, LaneInputEvent, LastRawByLane, PlayBinding, PlayingInputEvent, RawInput};
 
 pub trait LaneEventSource: InputEvent {
     fn lane_input(&self) -> Option<(usize, bool)>;
+}
+
+impl LaneEventSource for PlayingInputEvent {
+    fn lane_input(&self) -> Option<(usize, bool)> {
+        match self {
+            PlayingInputEvent::PlayKeyDown(k) => Some((play_key_to_lane(*k), true)),
+            PlayingInputEvent::PlayKeyUp(k) => Some((play_key_to_lane(*k), false)),
+            PlayingInputEvent::ScratchUpOn | PlayingInputEvent::ScratchDownOn => Some((3, true)),
+            PlayingInputEvent::ScratchUpOff | PlayingInputEvent::ScratchDownOff => {
+                Some((3, false))
+            }
+        }
+    }
+}
+
+fn play_key_to_lane(key: PlayBinding) -> usize {
+    match key {
+        PlayBinding::Key1 => 0,
+        PlayBinding::Key2 => 1,
+        PlayBinding::Key3 => 2,
+        PlayBinding::Key4 => 4,
+        PlayBinding::Key5 => 5,
+        PlayBinding::Key6 => 6,
+        PlayBinding::Key7 => 7,
+    }
 }
 
 pub fn input_events_to_lane_events<E: LaneEventSource>(

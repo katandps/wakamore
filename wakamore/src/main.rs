@@ -6,6 +6,7 @@ use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
 use bevy::window::PresentMode;
 use bevy::winit::WinitSettings;
+use common::{PlayingInputEvent, ResultInputEvent, TitleInputEvent};
 use component::fps::{FpsHistory, setup_fps, update_fps_text};
 use emitter::{
     emit_gamepad_button_lane_input, input_events_to_lane_events, record_lane_raw_events,
@@ -13,9 +14,8 @@ use emitter::{
 use input::{poll_playing_key_events, poll_result_key_events, poll_title_key_events};
 use resource::note::{NoteChart, ScoreSummary};
 use state::{
-    AppState, PlayingInputEvent, ResultInputEvent, TitleInputEvent, cleanup_playing,
-    cleanup_result, cleanup_title, map_playing_input_events, map_result_input_events,
-    map_title_input_events, update_playing_input, update_result_input, update_title_input,
+    AppState, cleanup_playing, cleanup_result, cleanup_title, update_playing_input,
+    update_result_input, update_title_input,
 };
 use system::input_log::record_judgement_to_log;
 use system::key_event_log::{
@@ -36,6 +36,21 @@ enum GameplayUpdateSet {
     JudgementLog,
     Animation,
     Spawn,
+}
+
+fn poll_key_events_by_state(
+    state: Res<State<AppState>>,
+    keys: Res<ButtonInput<KeyCode>>,
+    title_writer: MessageWriter<TitleInputEvent>,
+    playing_writer: MessageWriter<PlayingInputEvent>,
+    result_writer: MessageWriter<ResultInputEvent>,
+    bindings: Res<input::Bindings>,
+) {
+    match state.get() {
+        AppState::Title => poll_title_key_events(keys, title_writer, bindings),
+        AppState::Playing => poll_playing_key_events(keys, playing_writer, bindings),
+        AppState::Result => poll_result_key_events(keys, result_writer, bindings),
+    }
 }
 
 fn main() {
@@ -75,7 +90,6 @@ fn main() {
         .insert_resource(NoteChart::demo())
         .init_resource::<ScoreSummary>()
         .add_message::<common::LaneInputEvent>()
-        .add_message::<input::NormalizedInputEvent>()
         .add_message::<TitleInputEvent>()
         .add_message::<PlayingInputEvent>()
         .add_message::<ResultInputEvent>()
@@ -96,36 +110,21 @@ fn main() {
         )
         .add_systems(Startup, (setup_fps, setup_key_event_log_ui))
         .add_systems(Update, update_key_event_log_ui)
+        .add_systems(Update, poll_key_events_by_state)
         .add_systems(
             Update,
-            (
-                poll_title_key_events,
-                map_title_input_events,
-                record_key_events::<TitleInputEvent>,
-                update_title_input,
-            )
-                .chain()
+            (record_key_events::<TitleInputEvent>, update_title_input).chain()
                 .run_if(in_state(AppState::Title)),
         )
         .add_systems(
             Update,
-            (
-                poll_playing_key_events,
-                map_playing_input_events,
-                record_key_events::<PlayingInputEvent>,
-                update_playing_input,
-            )
+            (record_key_events::<PlayingInputEvent>, update_playing_input)
                 .chain()
                 .run_if(in_state(AppState::Playing)),
         )
         .add_systems(
             Update,
-            (
-                poll_result_key_events,
-                map_result_input_events,
-                record_key_events::<ResultInputEvent>,
-                update_result_input,
-            )
+            (record_key_events::<ResultInputEvent>, update_result_input)
                 .chain()
                 .run_if(in_state(AppState::Result)),
         )
