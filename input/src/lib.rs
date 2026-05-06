@@ -14,8 +14,6 @@ enum ActionBinding {
 enum KeyBinding {
     Action(ActionBinding),
     Play(PlayBinding),
-    ScratchUp,
-    ScratchDown,
 }
 
 #[derive(Debug, Default)]
@@ -54,16 +52,12 @@ const DEFAULT_BINDINGS_TOML: &str = r#"
 Key1 = "S"
 Key2 = "D"
 Key3 = "F"
-Key4 = "J"
-Key5 = "K"
-Key6 = "L"
-Key7 = "LShift"
-
-[playing.scratch_up_keys]
-ScratchUp = "Space"
-
-[playing.scratch_down_keys]
-ScratchDown = "RShift"
+Key4 = "Space"
+Key5 = "J"
+Key6 = "K"
+Key7 = "L"
+ScratchUp = "RShift"
+ScratchDown = "LShift"
 
 [title.actions]
 Confirm = "Enter"
@@ -117,12 +111,8 @@ impl Bindings {
     /// Expected format:
     /// [playing.play_keys]
     /// Key1 = "S"
-    ///
-    /// [playing.scratch_up_keys]
     /// ScratchUp = "Space"
-    ///
-    /// [playing.scratch_down_keys]
-    /// ScratchDown = "ShiftRight"
+    /// ScratchDown = "RShift"
     ///
     /// [result.actions]
     /// Confirm = "Enter"
@@ -165,37 +155,6 @@ impl Bindings {
                     .bind(key, KeyBinding::Play(play_key));
             } else {
                 eprintln!("unknown play key '{}', skipping", event);
-            }
-        });
-
-        parse_state_event_section(&v, "playing", "scratch_up_keys", |event, key| {
-            if parse_scratch_key(event) == Some(KeyBinding::ScratchUp) {
-                bindings
-                    .playing_bindings_mut()
-                    .bind(key, KeyBinding::ScratchUp);
-            } else {
-                eprintln!("unknown scratch key '{}', skipping", event);
-            }
-        });
-
-        parse_state_event_section(&v, "playing", "scratch_down_keys", |event, key| {
-            if parse_scratch_key(event) == Some(KeyBinding::ScratchDown) {
-                bindings
-                    .playing_bindings_mut()
-                    .bind(key, KeyBinding::ScratchDown);
-            } else {
-                eprintln!("unknown scratch key '{}', skipping", event);
-            }
-        });
-
-        // backward compatibility: legacy [playing.scratch_keys] means ScratchUp
-        parse_state_event_section(&v, "playing", "scratch_keys", |event, key| {
-            if parse_scratch_key(event).is_some() {
-                bindings
-                    .playing_bindings_mut()
-                    .bind(key, KeyBinding::ScratchUp);
-            } else {
-                eprintln!("unknown scratch key '{}', skipping", event);
             }
         });
 
@@ -243,14 +202,8 @@ fn parse_play_key(s: &str) -> Option<PlayBinding> {
         "Key5" | "5" => Some(PlayBinding::Key5),
         "Key6" | "6" => Some(PlayBinding::Key6),
         "Key7" | "7" => Some(PlayBinding::Key7),
-        _ => None,
-    }
-}
-
-fn parse_scratch_key(s: &str) -> Option<KeyBinding> {
-    match s {
-        "Scratch" | "scratch" | "ScratchUp" | "scratch_up" => Some(KeyBinding::ScratchUp),
-        "ScratchDown" | "scratch_down" => Some(KeyBinding::ScratchDown),
+        "ScratchUp" | "scratch_up" => Some(PlayBinding::ScratchUp),
+        "ScratchDown" | "scratch_down" => Some(PlayBinding::ScratchDown),
         _ => None,
     }
 }
@@ -354,18 +307,6 @@ pub fn poll_playing_key_events(
                 (KeyBinding::Play(play_key), false) => {
                     ev_writer.write(PlayingInputEvent::PlayKeyUp(play_key));
                 }
-                (KeyBinding::ScratchUp, true) => {
-                    ev_writer.write(PlayingInputEvent::ScratchUpOn);
-                }
-                (KeyBinding::ScratchUp, false) => {
-                    ev_writer.write(PlayingInputEvent::ScratchUpOff);
-                }
-                (KeyBinding::ScratchDown, true) => {
-                    ev_writer.write(PlayingInputEvent::ScratchDownOn);
-                }
-                (KeyBinding::ScratchDown, false) => {
-                    ev_writer.write(PlayingInputEvent::ScratchDownOff);
-                }
                 (KeyBinding::Action(_), _) => {}
             }
         },
@@ -416,11 +357,7 @@ mod tests {
 [playing.play_keys]
     Key1 = "S"
     Key4 = "J"
-
-[playing.scratch_up_keys]
     ScratchUp = "Space"
-
-[playing.scratch_down_keys]
     ScratchDown = "RShift"
 
 [result.actions]

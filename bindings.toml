@@ -6,16 +6,12 @@ Cancel = "Escape"
 Key1 = "S"
 Key2 = "D"
 Key3 = "F"
-Key4 = "J"
-Key5 = "K"
-Key6 = "L"
-Key7 = "LShift"
-
-[playing.scratch_up_keys]
-ScratchUp = "Space"
-
-[playing.scratch_down_keys]
-ScratchDown = "RShift"
+Key4 = "Space"
+Key5 = "J"
+Key6 = "K"
+Key7 = "L"
+ScratchUp = "RShift"
+ScratchDown = "LShift"
 
 [result.actions]
 Confirm = "Enter"

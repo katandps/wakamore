@@ -15,6 +15,8 @@ pub enum PlayBinding {
     Key5,
     Key6,
     Key7,
+    ScratchUp,
+    ScratchDown,
 }
 
 #[derive(Event, Message, Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,10 +31,6 @@ impl InputEvent for TitleInputEvent {}
 pub enum PlayingInputEvent {
     PlayKeyDown(PlayBinding),
     PlayKeyUp(PlayBinding),
-    ScratchUpOn,
-    ScratchUpOff,
-    ScratchDownOn,
-    ScratchDownOff,
 }
 
 impl InputEvent for PlayingInputEvent {}

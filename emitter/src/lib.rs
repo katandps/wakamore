@@ -12,10 +12,6 @@ impl LaneEventSource for PlayingInputEvent {
         match self {
             PlayingInputEvent::PlayKeyDown(k) => Some((play_key_to_lane(*k), true)),
             PlayingInputEvent::PlayKeyUp(k) => Some((play_key_to_lane(*k), false)),
-            PlayingInputEvent::ScratchUpOn | PlayingInputEvent::ScratchDownOn => Some((3, true)),
-            PlayingInputEvent::ScratchUpOff | PlayingInputEvent::ScratchDownOff => {
-                Some((3, false))
-            }
         }
     }
 }
@@ -29,6 +25,7 @@ fn play_key_to_lane(key: PlayBinding) -> usize {
         PlayBinding::Key5 => 5,
         PlayBinding::Key6 => 6,
         PlayBinding::Key7 => 7,
+        PlayBinding::ScratchUp | PlayBinding::ScratchDown => 3,
     }
 }
 
