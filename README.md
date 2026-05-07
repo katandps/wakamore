@@ -52,6 +52,7 @@ cargo run --package wakamore
 - 記法は「イベント名 = キー名」です（例: `Confirm = "Enter"`, `Key1 = "S"`）。
 - 例: `[title.actions]`, `[playing.play_keys]`, `[result.actions]`
 - `playing` だけがレーン入力 (`play_keys`) を使い、`title` / `result` は `actions` を使います。
+- `playing.actions` には `Abort` を設定でき、プレイ中に中断してリザルトへ遷移できます（例: `Abort = "R"`）。
 
 システムの連携:
 

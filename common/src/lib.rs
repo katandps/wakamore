@@ -31,6 +31,7 @@ impl InputEvent for TitleInputEvent {}
 pub enum PlayingInputEvent {
     PlayKeyDown(PlayBinding),
     PlayKeyUp(PlayBinding),
+    Abort,
 }
 
 impl InputEvent for PlayingInputEvent {}

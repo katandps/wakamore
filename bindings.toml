@@ -13,6 +13,9 @@ Key7 = "L"
 ScratchUp = "RShift"
 ScratchDown = "LShift"
 
+[playing.actions]
+Abort = "R"
+
 [result.actions]
 Confirm = "Enter"
 Cancel = "Escape"

@@ -12,6 +12,7 @@ impl LaneEventSource for PlayingInputEvent {
         match self {
             PlayingInputEvent::PlayKeyDown(k) => Some((play_key_to_lane(*k), true)),
             PlayingInputEvent::PlayKeyUp(k) => Some((play_key_to_lane(*k), false)),
+            PlayingInputEvent::Abort => None,
         }
     }
 }

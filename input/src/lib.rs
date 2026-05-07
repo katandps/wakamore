@@ -11,8 +11,14 @@ enum ActionBinding {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PlayingActionBinding {
+    Abort,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum KeyBinding {
     Action(ActionBinding),
+    PlayingAction(PlayingActionBinding),
     Play(PlayBinding),
 }
 
@@ -58,6 +64,9 @@ Key6 = "K"
 Key7 = "L"
 ScratchUp = "RShift"
 ScratchDown = "LShift"
+
+[playing.actions]
+Abort = "R"
 
 [title.actions]
 Confirm = "Enter"
@@ -114,6 +123,9 @@ impl Bindings {
     /// ScratchUp = "Space"
     /// ScratchDown = "RShift"
     ///
+    /// [playing.actions]
+    /// Abort = "R"
+    ///
     /// [result.actions]
     /// Confirm = "Enter"
     /// Cancel = "Escape"
@@ -158,6 +170,16 @@ impl Bindings {
             }
         });
 
+        parse_state_event_section(&v, "playing", "actions", |event, key| {
+            if let Some(action) = parse_playing_action(event) {
+                bindings
+                    .playing_bindings_mut()
+                    .bind(key, KeyBinding::PlayingAction(action));
+            } else {
+                eprintln!("unknown playing action '{}', skipping", event);
+            }
+        });
+
         Ok(bindings)
     }
 }
@@ -189,6 +211,13 @@ fn parse_input_action(s: &str) -> Option<ActionBinding> {
     match s {
         "Confirm" | "confirm" => Some(ActionBinding::Confirm),
         "Cancel" | "cancel" => Some(ActionBinding::Cancel),
+        _ => None,
+    }
+}
+
+fn parse_playing_action(s: &str) -> Option<PlayingActionBinding> {
+    match s {
+        "Abort" => Some(PlayingActionBinding::Abort),
         _ => None,
     }
 }
@@ -307,6 +336,10 @@ pub fn poll_playing_key_events(
                 (KeyBinding::Play(play_key), false) => {
                     ev_writer.write(PlayingInputEvent::PlayKeyUp(play_key));
                 }
+                (KeyBinding::PlayingAction(PlayingActionBinding::Abort), true) => {
+                    ev_writer.write(PlayingInputEvent::Abort);
+                }
+                (KeyBinding::PlayingAction(_), false) => {}
                 (KeyBinding::Action(_), _) => {}
             }
         },
@@ -360,6 +393,9 @@ mod tests {
     ScratchUp = "Space"
     ScratchDown = "RShift"
 
+[playing.actions]
+    Abort = "R"
+
 [result.actions]
     Confirm = "Enter"
     Cancel = "Escape"
@@ -376,6 +412,14 @@ mod tests {
             .playing_bindings()
             .pressed_bindings(bevy::prelude::KeyCode::KeyS);
         assert_eq!(playing_s_pressed, vec![KeyBinding::Play(PlayBinding::Key1)]);
+
+        let playing_force_result_pressed = b
+            .playing_bindings()
+            .pressed_bindings(bevy::prelude::KeyCode::KeyR);
+        assert_eq!(
+            playing_force_result_pressed,
+            vec![KeyBinding::PlayingAction(PlayingActionBinding::Abort)]
+        );
 
         let playing_s_released = b
             .playing_bindings()

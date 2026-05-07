@@ -1,14 +1,18 @@
 use bevy::prelude::*;
+use common::PlayingInputEvent;
 
 use crate::component::GameplayEntity;
 use crate::state::AppState;
 
 pub fn update_playing_input(
-    keys: Res<ButtonInput<KeyCode>>,
+    mut input_reader: MessageReader<PlayingInputEvent>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
-    if keys.just_pressed(KeyCode::KeyR) {
-        next_state.set(AppState::Result);
+    for ev in input_reader.read() {
+        if matches!(ev, PlayingInputEvent::Abort) {
+            next_state.set(AppState::Result);
+            break;
+        }
     }
 }
 
