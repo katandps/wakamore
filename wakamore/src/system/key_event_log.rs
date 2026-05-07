@@ -1,5 +1,3 @@
-//! キーイベントオーバーレイ: プレイ中に受け取った InputEvent を画面右側に時刻付きで表示する。
-
 use bevy::prelude::*;
 use common::InputEvent;
 use std::collections::VecDeque;
@@ -8,15 +6,12 @@ const MAX_ENTRIES: usize = 20;
 const ENTRY_LIFETIME_SECS: f32 = 6.0;
 const OVERLAY_COLOR: Color = Color::srgb(0.6, 1.0, 0.2); // 黄緑
 
-/// 最近の InputEvent を時刻付きで保持するリングバッファ。
 #[derive(Resource, Default)]
 pub struct KeyEventLog(pub VecDeque<(f32, String)>); // (elapsed_secs, ラベル)
 
-/// キーイベントログを表示する UI テキストエンティティのマーカー。
 #[derive(Component)]
 pub struct KeyEventLogUi;
 
-/// 起動時に UI テキストエンティティを生成する（全画面で常時表示）。
 pub fn setup_key_event_log_ui(mut commands: Commands) {
     commands.spawn((
         Text::new(""),
@@ -37,7 +32,6 @@ pub fn setup_key_event_log_ui(mut commands: Commands) {
     ));
 }
 
-/// InputEvent を購読してログバッファに追記する。
 pub fn record_key_events<E: InputEvent + std::fmt::Debug>(
     mut input_reader: MessageReader<E>,
     time: Res<Time>,
@@ -53,7 +47,6 @@ pub fn record_key_events<E: InputEvent + std::fmt::Debug>(
     }
 }
 
-/// ログバッファの内容を UI テキストに反映し、古いエントリを削除する。
 pub fn update_key_event_log_ui(
     time: Res<Time>,
     mut log: ResMut<KeyEventLog>,
@@ -72,5 +65,3 @@ pub fn update_key_event_log_ui(
     }
     text.0 = s;
 }
-
-// label is derived from Debug impl of each per-state event enum.
