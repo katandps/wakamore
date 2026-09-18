@@ -5,6 +5,9 @@ edition = "2024"
 
 [dependencies]
 bytemuck = { version = "1.23", features = ["derive"] }
-pollster = "0.4"
-wgpu = "25.0"
-winit = "0.30"
+egui = "0.36.2"
+egui-wgpu = { version = "0.36.2", default-features = false }
+egui-winit = "0.36.2"
+pollster = "1.0.1"
+wgpu = { version = "30.0.1", default-features = false, features = ["webgpu", "webgl"] }
+winit = "0.30.13"
