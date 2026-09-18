@@ -1,9 +1,10 @@
 use std::time::{Duration, Instant};
 use wgpu::util::DeviceExt;
 use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    window::Window,
+    application::ApplicationHandler,
+    event::WindowEvent,
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+    window::{Window, WindowId},
 };
 
 const WINDOW_TITLE: &str = "wakamore: wgpu 2D demo";
@@ -288,38 +289,81 @@ impl Renderer {
     }
 }
 
+struct App {
+    window: Option<&'static Window>,
+    renderer: Option<Renderer>,
+    performance: PerformanceCounter,
+}
+
+impl App {
+    fn new() -> Self {
+        Self {
+            window: None,
+            renderer: None,
+            performance: PerformanceCounter::new(),
+        }
+    }
+}
+
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.window.is_some() {
+            return;
+        }
+
+        let window: &'static Window = Box::leak(Box::new(
+            event_loop
+                .create_window(Window::default_attributes().with_title(WINDOW_TITLE))
+                .expect("ウィンドウの作成に失敗しました"),
+        ));
+        self.renderer = Some(pollster::block_on(Renderer::new(window)));
+        self.window = Some(window);
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        if self.window.map(Window::id) != Some(window_id) {
+            return;
+        }
+
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::Resized(size) => {
+                if let Some(renderer) = self.renderer.as_mut() {
+                    renderer.resize(size);
+                }
+            }
+            WindowEvent::RedrawRequested => {
+                if let Some(renderer) = self.renderer.as_mut()
+                    && renderer.render()
+                {
+                    self.performance.record_render();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        if self.performance.record_loop()
+            && let Some(window) = self.window
+        {
+            window.set_title(&self.performance.title());
+        }
+        if let Some(window) = self.window {
+            window.request_redraw();
+        }
+    }
+}
+
 fn main() {
     let event_loop = EventLoop::new().expect("イベントループの作成に失敗しました");
-    let window: &'static Window = Box::leak(Box::new(
-        event_loop
-            .create_window(Window::default_attributes().with_title(WINDOW_TITLE))
-            .expect("ウィンドウの作成に失敗しました"),
-    ));
-    let mut renderer = pollster::block_on(Renderer::new(window));
-    let mut performance = PerformanceCounter::new();
-
+    event_loop.set_control_flow(ControlFlow::Poll);
     event_loop
-        .run(move |event, event_loop| {
-            event_loop.set_control_flow(ControlFlow::Poll);
-            match event {
-                Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::CloseRequested => event_loop.exit(),
-                    WindowEvent::Resized(size) => renderer.resize(size),
-                    WindowEvent::RedrawRequested => {
-                        if renderer.render() {
-                            performance.record_render();
-                        }
-                    }
-                    _ => {}
-                },
-                Event::AboutToWait => {
-                    if performance.record_loop() {
-                        window.set_title(&performance.title());
-                    }
-                    window.request_redraw();
-                }
-                _ => {}
-            }
-        })
+        .run_app(&mut App::new())
         .expect("イベントループの実行に失敗しました");
 }
