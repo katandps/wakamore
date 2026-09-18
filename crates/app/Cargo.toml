@@ -9,5 +9,5 @@ egui = "0.36.2"
 egui-wgpu = { version = "0.36.2", default-features = false }
 egui-winit = "0.36.2"
 pollster = "1.0.1"
-wgpu = { version = "30.0.1", default-features = false, features = ["webgpu", "webgl"] }
+wgpu = { version = "30.0.1", default-features = false, features = ["gles", "wgsl"] }
 winit = "0.30.13"
