@@ -77,6 +77,7 @@ impl DebugRenderer {
         context: &egui::Context,
         egui_state: &mut EguiState,
         performance: &PerformanceCounter,
+        current_screen: &str,
     ) -> bool {
         let raw_input = egui_state.take_egui_input(window);
         let mut full_output = context.run_ui(raw_input, |ui| {
@@ -103,6 +104,9 @@ impl DebugRenderer {
                         ui.end_row();
                         ui.label("Window size");
                         ui.label(format!("{} x {}", self.config.width, self.config.height));
+                        ui.end_row();
+                        ui.label("Current screen");
+                        ui.label(current_screen);
                         ui.end_row();
                     });
                 ui.add_space(12.0);

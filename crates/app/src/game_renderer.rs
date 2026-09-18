@@ -81,6 +81,12 @@ pub struct GameRenderer {
     vertex_buffer: wgpu::Buffer,
 }
 
+#[derive(Clone, Copy)]
+pub enum GameRenderState {
+    Title,
+    Gameplay,
+}
+
 impl GameRenderer {
     pub async fn new(window: &'static Window) -> Self {
         let size = window.inner_size();
@@ -152,7 +158,7 @@ impl GameRenderer {
         self.surface.configure(&self.device, &self.config);
     }
 
-    pub fn render(&mut self) -> bool {
+    pub fn render(&mut self, state: GameRenderState) -> bool {
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
@@ -180,7 +186,20 @@ impl GameRenderer {
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        load: wgpu::LoadOp::Clear(match state {
+                            GameRenderState::Title => wgpu::Color {
+                                r: 0.03,
+                                g: 0.05,
+                                b: 0.10,
+                                a: 1.0,
+                            },
+                            GameRenderState::Gameplay => wgpu::Color {
+                                r: 0.02,
+                                g: 0.12,
+                                b: 0.08,
+                                a: 1.0,
+                            },
+                        }),
                         store: wgpu::StoreOp::Store,
                     },
                 })],

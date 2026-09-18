@@ -1,6 +1,7 @@
 use crate::debug_renderer::DebugRenderer;
 use crate::game_renderer::GameRenderer;
 use crate::performance::{MAIN_LOOP_PERIOD, PerformanceCounter, RENDER_PERIOD};
+use crate::screen::{ScreenCommand, ScreenManager};
 use std::time::Instant;
 use winit::{
     application::ApplicationHandler,
@@ -17,6 +18,7 @@ pub struct App {
     game_window: Option<&'static Window>,
     debug_window: Option<&'static Window>,
     game_renderer: Option<GameRenderer>,
+    screen_manager: ScreenManager,
     debug_renderer: Option<DebugRenderer>,
     egui_context: egui::Context,
     egui_state: Option<egui_winit::State>,
@@ -35,6 +37,7 @@ impl App {
             game_window: None,
             debug_window: None,
             game_renderer: None,
+            screen_manager: ScreenManager::new(),
             debug_renderer: None,
             egui_context: egui::Context::default(),
             egui_state: None,
@@ -109,12 +112,14 @@ impl App {
             WindowEvent::RedrawRequested if self.game_render_pending => {
                 self.game_render_pending = false;
                 if let Some(renderer) = self.game_renderer.as_mut()
-                    && renderer.render()
+                    && self.screen_manager.render(renderer)
                 {
                     self.performance.record_render();
                 }
             }
-            _ => {}
+            event => match self.screen_manager.handle_event(&event) {
+                ScreenCommand::None | ScreenCommand::Replace(_) => {}
+            },
         }
     }
 
@@ -143,7 +148,13 @@ impl App {
                     self.debug_window,
                     self.egui_state.as_mut(),
                 ) {
-                    let _ = renderer.render(window, &self.egui_context, state, &self.performance);
+                    let _ = renderer.render(
+                        window,
+                        &self.egui_context,
+                        state,
+                        &self.performance,
+                        self.screen_manager.current_screen_name(),
+                    );
                 }
             }
             _ => {}
@@ -175,6 +186,7 @@ impl ApplicationHandler for App {
         let now = Instant::now();
         if now >= self.next_loop_at {
             self.performance.record_loop();
+            self.screen_manager.update();
             self.next_loop_at = next_deadline(now, self.next_loop_at, MAIN_LOOP_PERIOD);
         }
 
