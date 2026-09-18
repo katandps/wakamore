@@ -1,9 +1,63 @@
+use std::time::{Duration, Instant};
 use wgpu::util::DeviceExt;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
+
+const WINDOW_TITLE: &str = "wakamore: wgpu 2D demo";
+
+struct PerformanceCounter {
+    sample_started_at: Instant,
+    loop_count: u64,
+    render_count: u64,
+    loops_per_second: f64,
+    frames_per_second: f64,
+}
+
+impl PerformanceCounter {
+    fn new() -> Self {
+        Self {
+            sample_started_at: Instant::now(),
+            loop_count: 0,
+            render_count: 0,
+            loops_per_second: 0.0,
+            frames_per_second: 0.0,
+        }
+    }
+
+    fn record_loop(&mut self) -> bool {
+        self.loop_count += 1;
+        self.update_rates()
+    }
+
+    fn record_render(&mut self) {
+        self.render_count += 1;
+    }
+
+    fn title(&self) -> String {
+        format!(
+            "{WINDOW_TITLE} | Loop: {:.0} Hz | Render: {:.0} FPS",
+            self.loops_per_second, self.frames_per_second
+        )
+    }
+
+    fn update_rates(&mut self) -> bool {
+        let elapsed = self.sample_started_at.elapsed();
+        if elapsed < Duration::from_secs(1) {
+            return false;
+        }
+
+        let seconds = elapsed.as_secs_f64();
+        self.loops_per_second = self.loop_count as f64 / seconds;
+        self.frames_per_second = self.render_count as f64 / seconds;
+        self.loop_count = 0;
+        self.render_count = 0;
+        self.sample_started_at = Instant::now();
+        true
+    }
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -118,7 +172,7 @@ impl Renderer {
             format,
             width: size.width.max(1),
             height: size.height.max(1),
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode: wgpu::PresentMode::Immediate, // 垂直同期オフ / オン: Fifo
             alpha_mode: capabilities.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
@@ -223,10 +277,11 @@ fn main() {
     let event_loop = EventLoop::new().expect("イベントループの作成に失敗しました");
     let window: &'static Window = Box::leak(Box::new(
         event_loop
-            .create_window(Window::default_attributes().with_title("wakamore: wgpu 2D demo"))
+            .create_window(Window::default_attributes().with_title(WINDOW_TITLE))
             .expect("ウィンドウの作成に失敗しました"),
     ));
     let mut renderer = pollster::block_on(Renderer::new(window));
+    let mut performance = PerformanceCounter::new();
 
     event_loop
         .run(move |event, event_loop| {
@@ -236,7 +291,7 @@ fn main() {
                     WindowEvent::CloseRequested => event_loop.exit(),
                     WindowEvent::Resized(size) => renderer.resize(size),
                     WindowEvent::RedrawRequested => match renderer.render() {
-                        Ok(()) => {}
+                        Ok(()) => performance.record_render(),
                         Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                             renderer.resize(window.inner_size());
                         }
@@ -246,7 +301,12 @@ fn main() {
                     },
                     _ => {}
                 },
-                Event::AboutToWait => window.request_redraw(),
+                Event::AboutToWait => {
+                    if performance.record_loop() {
+                        window.set_title(&performance.title());
+                    }
+                    window.request_redraw();
+                }
                 _ => {}
             }
         })
