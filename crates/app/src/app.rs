@@ -148,12 +148,15 @@ impl App {
                     self.debug_window,
                     self.egui_state.as_mut(),
                 ) {
+                    let main_window_size =
+                        self.game_window.map(Window::inner_size).unwrap_or_default();
                     let _ = renderer.render(
                         window,
                         &self.egui_context,
                         state,
                         &self.performance,
                         self.screen_manager.current_screen_name(),
+                        main_window_size,
                     );
                 }
             }

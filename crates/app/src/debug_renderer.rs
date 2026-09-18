@@ -1,4 +1,4 @@
-use crate::performance::{MAIN_LOOP_PERIOD, PerformanceCounter, RENDER_PERIOD};
+use crate::performance::PerformanceCounter;
 use egui_wgpu::{Renderer, RendererOptions, ScreenDescriptor};
 use egui_winit::State as EguiState;
 use winit::window::Window;
@@ -78,6 +78,7 @@ impl DebugRenderer {
         egui_state: &mut EguiState,
         performance: &PerformanceCounter,
         current_screen: &str,
+        main_window_size: winit::dpi::PhysicalSize<u32>,
     ) -> bool {
         let raw_input = egui_state.take_egui_input(window);
         let mut full_output = context.run_ui(raw_input, |ui| {
@@ -93,17 +94,11 @@ impl DebugRenderer {
                         ui.label("Render");
                         ui.label(format!("{:.1} FPS", performance.frames_per_second));
                         ui.end_row();
-                        ui.label("Main loop target");
-                        ui.label(format!(
-                            "{:.2} us",
-                            MAIN_LOOP_PERIOD.as_secs_f64() * 1_000_000.0
-                        ));
-                        ui.end_row();
-                        ui.label("Render target");
-                        ui.label(format!("{:.2} FPS", 1.0 / RENDER_PERIOD.as_secs_f64()));
-                        ui.end_row();
                         ui.label("Window size");
-                        ui.label(format!("{} x {}", self.config.width, self.config.height));
+                        ui.label(format!(
+                            "{} x {}",
+                            main_window_size.width, main_window_size.height
+                        ));
                         ui.end_row();
                         ui.label("Current screen");
                         ui.label(current_screen);
