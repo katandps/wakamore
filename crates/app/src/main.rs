@@ -8,6 +8,8 @@ use winit::{
 };
 
 const WINDOW_TITLE: &str = "wakamore: wgpu 2D demo";
+const MAIN_LOOP_PERIOD: Duration = Duration::from_micros(50); // 0.1ms以上の判定精度は要求しない
+const RENDER_PERIOD: Duration = Duration::from_nanos(8_333_333);
 
 struct PerformanceCounter {
     sample_started_at: Instant,
@@ -293,14 +295,21 @@ struct App {
     window: Option<&'static Window>,
     renderer: Option<Renderer>,
     performance: PerformanceCounter,
+    next_loop_at: Instant,
+    next_render_at: Instant,
+    render_pending: bool,
 }
 
 impl App {
     fn new() -> Self {
+        let now = Instant::now();
         Self {
             window: None,
             renderer: None,
             performance: PerformanceCounter::new(),
+            next_loop_at: now,
+            next_render_at: now,
+            render_pending: false,
         }
     }
 }
@@ -338,31 +347,53 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => {
-                if let Some(renderer) = self.renderer.as_mut()
-                    && renderer.render()
-                {
-                    self.performance.record_render();
+                if self.render_pending {
+                    self.render_pending = false;
+                    if let Some(renderer) = self.renderer.as_mut()
+                        && renderer.render()
+                    {
+                        self.performance.record_render();
+                    }
                 }
             }
             _ => {}
         }
     }
 
-    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        if self.performance.record_loop()
-            && let Some(window) = self.window
-        {
-            window.set_title(&self.performance.title());
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        let now = Instant::now();
+
+        if now >= self.next_loop_at {
+            if self.performance.record_loop()
+                && let Some(window) = self.window
+            {
+                window.set_title(&self.performance.title());
+            }
+            self.next_loop_at = next_deadline(now, self.next_loop_at, MAIN_LOOP_PERIOD);
         }
-        if let Some(window) = self.window {
-            window.request_redraw();
+
+        if now >= self.next_render_at && !self.render_pending {
+            self.render_pending = true;
+            self.next_render_at = next_deadline(now, self.next_render_at, RENDER_PERIOD);
+            if let Some(window) = self.window {
+                window.request_redraw();
+            }
         }
+
+        event_loop.set_control_flow(ControlFlow::WaitUntil(
+            self.next_loop_at.min(self.next_render_at),
+        ));
     }
+}
+
+fn next_deadline(now: Instant, previous: Instant, period: Duration) -> Instant {
+    let next = previous + period;
+    if next <= now { now + period } else { next }
 }
 
 fn main() {
     let event_loop = EventLoop::new().expect("イベントループの作成に失敗しました");
-    event_loop.set_control_flow(ControlFlow::Poll);
+    event_loop.set_control_flow(ControlFlow::Wait);
     event_loop
         .run_app(&mut App::new())
         .expect("イベントループの実行に失敗しました");
