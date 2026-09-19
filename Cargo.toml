@@ -4,3 +4,6 @@ members = [
     "crates/app",
     "crates/play_core"
 ]
+
+[workspace.dependencies]
+log = "0.4.34"
