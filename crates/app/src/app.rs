@@ -14,6 +14,29 @@ use winit::{
 const GAME_WINDOW_TITLE: &str = "wakamore: game";
 const DEBUG_WINDOW_TITLE: &str = "wakamore: debug";
 
+/// メインループ・描画の起動タイミングと再描画要求の保留状態をまとめる。
+struct FrameTiming {
+    next_loop_at: Instant,
+    next_render_at: Instant,
+    game_render_pending: bool,
+    debug_render_pending: bool,
+}
+
+impl FrameTiming {
+    fn new(now: Instant) -> Self {
+        Self {
+            next_loop_at: now,
+            next_render_at: now,
+            game_render_pending: false,
+            debug_render_pending: false,
+        }
+    }
+
+    fn next_wait_deadline(&self) -> Instant {
+        self.next_loop_at.min(self.next_render_at)
+    }
+}
+
 pub struct App {
     game_window: Option<&'static Window>,
     debug_window: Option<&'static Window>,
@@ -23,10 +46,7 @@ pub struct App {
     egui_context: egui::Context,
     egui_state: Option<egui_winit::State>,
     performance: PerformanceCounter,
-    next_loop_at: Instant,
-    next_render_at: Instant,
-    game_render_pending: bool,
-    debug_render_pending: bool,
+    frame_timing: FrameTiming,
     debug_visible: bool,
 }
 
@@ -42,10 +62,7 @@ impl App {
             egui_context: egui::Context::default(),
             egui_state: None,
             performance: PerformanceCounter::new(),
-            next_loop_at: now,
-            next_render_at: now,
-            game_render_pending: false,
-            debug_render_pending: false,
+            frame_timing: FrameTiming::new(now),
             debug_visible: true,
         }
     }
@@ -109,8 +126,8 @@ impl App {
             {
                 self.toggle_debug_window();
             }
-            WindowEvent::RedrawRequested if self.game_render_pending => {
-                self.game_render_pending = false;
+            WindowEvent::RedrawRequested if self.frame_timing.game_render_pending => {
+                self.frame_timing.game_render_pending = false;
                 if let Some(renderer) = self.game_renderer.as_mut()
                     && self.screen_manager.render(renderer)
                 {
@@ -131,7 +148,7 @@ impl App {
         match event {
             WindowEvent::CloseRequested => {
                 self.debug_visible = false;
-                self.debug_render_pending = false;
+                self.frame_timing.debug_render_pending = false;
                 if let Some(window) = self.debug_window {
                     window.set_visible(false);
                 }
@@ -141,8 +158,8 @@ impl App {
                     renderer.resize(size);
                 }
             }
-            WindowEvent::RedrawRequested if self.debug_render_pending => {
-                self.debug_render_pending = false;
+            WindowEvent::RedrawRequested if self.frame_timing.debug_render_pending => {
+                self.frame_timing.debug_render_pending = false;
                 if let (Some(renderer), Some(window), Some(state)) = (
                     self.debug_renderer.as_mut(),
                     self.debug_window,
@@ -187,22 +204,24 @@ impl ApplicationHandler for App {
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let now = Instant::now();
-        if now >= self.next_loop_at {
+        if now >= self.frame_timing.next_loop_at {
             self.performance.record_loop();
             self.screen_manager.update();
-            self.next_loop_at = next_deadline(now, self.next_loop_at, MAIN_LOOP_PERIOD);
+            self.frame_timing.next_loop_at =
+                next_deadline(now, self.frame_timing.next_loop_at, MAIN_LOOP_PERIOD);
         }
 
-        if now >= self.next_render_at {
-            self.next_render_at = next_deadline(now, self.next_render_at, RENDER_PERIOD);
-            if !self.game_render_pending {
-                self.game_render_pending = true;
+        if now >= self.frame_timing.next_render_at {
+            self.frame_timing.next_render_at =
+                next_deadline(now, self.frame_timing.next_render_at, RENDER_PERIOD);
+            if !self.frame_timing.game_render_pending {
+                self.frame_timing.game_render_pending = true;
                 if let Some(window) = self.game_window {
                     window.request_redraw();
                 }
             }
-            if self.debug_visible && !self.debug_render_pending {
-                self.debug_render_pending = true;
+            if self.debug_visible && !self.frame_timing.debug_render_pending {
+                self.frame_timing.debug_render_pending = true;
                 if let Some(window) = self.debug_window {
                     window.request_redraw();
                 }
@@ -210,7 +229,7 @@ impl ApplicationHandler for App {
         }
 
         event_loop.set_control_flow(ControlFlow::WaitUntil(
-            self.next_loop_at.min(self.next_render_at),
+            self.frame_timing.next_wait_deadline(),
         ));
     }
 }
