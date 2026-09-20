@@ -1,6 +1,6 @@
 use crate::game_renderer::GameRenderer;
 use crate::screen::{ScreenCommand, ScreenManager};
-use debug::{DebugRenderer, MAIN_LOOP_PERIOD, PerformanceCounter, RENDER_PERIOD};
+use debug::{DebugRenderer, PerformanceCounter};
 use std::time::Instant;
 use winit::{
     application::ApplicationHandler,
@@ -13,28 +13,11 @@ use winit::{
 const GAME_WINDOW_TITLE: &str = "wakamore: game";
 const DEBUG_WINDOW_TITLE: &str = "wakamore: debug";
 
-/// メインループ・描画の起動タイミングと再描画要求の保留状態をまとめる。
-struct FrameTiming {
-    next_loop_at: Instant,
-    next_render_at: Instant,
-    game_render_pending: bool,
-    debug_render_pending: bool,
-}
+use crate::loop_manager::LoopManager;
+use std::time::Duration;
 
-impl FrameTiming {
-    fn new(now: Instant) -> Self {
-        Self {
-            next_loop_at: now,
-            next_render_at: now,
-            game_render_pending: false,
-            debug_render_pending: false,
-        }
-    }
-
-    fn next_wait_deadline(&self) -> Instant {
-        self.next_loop_at.min(self.next_render_at)
-    }
-}
+pub const MAIN_LOOP_PERIOD: Duration = Duration::from_micros(50);
+pub const RENDER_PERIOD: Duration = Duration::from_nanos(8_333_333);
 
 pub struct App {
     game_window: Option<&'static Window>,
@@ -43,21 +26,24 @@ pub struct App {
     screen_manager: ScreenManager,
     debug_renderer: Option<DebugRenderer>,
     performance: PerformanceCounter,
-    frame_timing: FrameTiming,
+    main_loop: LoopManager,
+    render_loop: LoopManager,
+    debug_loop: LoopManager,
     debug_visible: bool,
 }
 
 impl App {
     fn new() -> Self {
-        let now = Instant::now();
         Self {
             game_window: None,
             debug_window: None,
             game_renderer: None,
             screen_manager: ScreenManager::new(),
             debug_renderer: None,
-            performance: PerformanceCounter::new(),
-            frame_timing: FrameTiming::new(now),
+            performance: PerformanceCounter::default(),
+            main_loop: LoopManager::new(Instant::now(), MAIN_LOOP_PERIOD),
+            render_loop: LoopManager::new(Instant::now(), RENDER_PERIOD),
+            debug_loop: LoopManager::new(Instant::now(), RENDER_PERIOD),
             debug_visible: true,
         }
     }
@@ -113,8 +99,8 @@ impl App {
             {
                 self.toggle_debug_window();
             }
-            WindowEvent::RedrawRequested if self.frame_timing.game_render_pending => {
-                self.frame_timing.game_render_pending = false;
+            WindowEvent::RedrawRequested if self.main_loop.render_is_pending() => {
+                self.main_loop.render_set_pending(false);
                 if let Some(renderer) = self.game_renderer.as_mut()
                     && self.screen_manager.render(renderer)
                 {
@@ -135,7 +121,7 @@ impl App {
         match event {
             WindowEvent::CloseRequested => {
                 self.debug_visible = false;
-                self.frame_timing.debug_render_pending = false;
+                self.debug_loop.render_set_pending(false);
                 if let Some(window) = self.debug_window {
                     window.set_visible(false);
                 }
@@ -145,8 +131,8 @@ impl App {
                     renderer.resize(size);
                 }
             }
-            WindowEvent::RedrawRequested if self.frame_timing.debug_render_pending => {
-                self.frame_timing.debug_render_pending = false;
+            WindowEvent::RedrawRequested if self.debug_loop.render_is_pending() => {
+                self.debug_loop.render_set_pending(false);
                 if let (Some(renderer), Some(window)) =
                     (self.debug_renderer.as_mut(), self.debug_window)
                 {
@@ -187,39 +173,31 @@ impl ApplicationHandler for App {
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let now = Instant::now();
-        if now >= self.frame_timing.next_loop_at {
+        if self.main_loop.next_loop_is_came(now) {
             self.performance.record_loop();
             self.screen_manager.update();
-            self.frame_timing.next_loop_at =
-                next_deadline(now, self.frame_timing.next_loop_at, MAIN_LOOP_PERIOD);
+            self.main_loop.update_loop_state(now);
         }
 
-        if now >= self.frame_timing.next_render_at {
-            self.frame_timing.next_render_at =
-                next_deadline(now, self.frame_timing.next_render_at, RENDER_PERIOD);
-            if !self.frame_timing.game_render_pending {
-                self.frame_timing.game_render_pending = true;
-                if let Some(window) = self.game_window {
-                    window.request_redraw();
-                }
+        if self.render_loop.next_loop_is_came(now) {
+            self.render_loop.update_loop_state(now);
+            if !self.render_loop.render_is_pending()
+                && let Some(window) = self.game_window
+            {
+                self.render_loop.render_set_pending(true);
+                window.request_redraw();
             }
-            if self.debug_visible && !self.frame_timing.debug_render_pending {
-                self.frame_timing.debug_render_pending = true;
-                if let Some(window) = self.debug_window {
-                    window.request_redraw();
-                }
+            if self.debug_visible
+                && !self.debug_loop.render_is_pending()
+                && let Some(window) = self.debug_window
+            {
+                self.debug_loop.render_set_pending(true);
+                window.request_redraw();
             }
         }
 
-        event_loop.set_control_flow(ControlFlow::WaitUntil(
-            self.frame_timing.next_wait_deadline(),
-        ));
+        event_loop.set_control_flow(ControlFlow::WaitUntil(self.main_loop.next_wait_deadline()));
     }
-}
-
-fn next_deadline(now: Instant, previous: Instant, period: std::time::Duration) -> Instant {
-    let next = previous + period;
-    if next <= now { now + period } else { next }
 }
 
 pub fn run() {
