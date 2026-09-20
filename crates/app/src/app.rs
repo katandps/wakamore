@@ -99,8 +99,8 @@ impl App {
             {
                 self.toggle_debug_window();
             }
-            WindowEvent::RedrawRequested if self.main_loop.render_is_pending() => {
-                self.main_loop.render_set_pending(false);
+            WindowEvent::RedrawRequested if self.render_loop.render_is_pending() => {
+                self.render_loop.render_set_pending(false);
                 if let Some(renderer) = self.game_renderer.as_mut()
                     && self.screen_manager.render(renderer)
                 {
