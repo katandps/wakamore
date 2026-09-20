@@ -76,9 +76,7 @@ name = "app"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
- "egui",
- "egui-wgpu",
- "egui-winit",
+ "debug",
  "log",
  "pollster",
  "wgpu",
@@ -396,6 +394,18 @@ name = "cursor-icon"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
+
+[[package]]
+name = "debug"
+version = "0.1.0"
+dependencies = [
+ "egui",
+ "egui-wgpu",
+ "egui-winit",
+ "log",
+ "wgpu",
+ "winit",
+]
 
 [[package]]
 name = "dispatch"

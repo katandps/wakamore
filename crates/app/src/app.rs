@@ -1,7 +1,6 @@
-use crate::debug_renderer::DebugRenderer;
 use crate::game_renderer::GameRenderer;
-use crate::performance::{MAIN_LOOP_PERIOD, PerformanceCounter, RENDER_PERIOD};
 use crate::screen::{ScreenCommand, ScreenManager};
+use debug::{DebugRenderer, MAIN_LOOP_PERIOD, PerformanceCounter, RENDER_PERIOD};
 use std::time::Instant;
 use winit::{
     application::ApplicationHandler,
@@ -43,8 +42,6 @@ pub struct App {
     game_renderer: Option<GameRenderer>,
     screen_manager: ScreenManager,
     debug_renderer: Option<DebugRenderer>,
-    egui_context: egui::Context,
-    egui_state: Option<egui_winit::State>,
     performance: PerformanceCounter,
     frame_timing: FrameTiming,
     debug_visible: bool,
@@ -59,8 +56,6 @@ impl App {
             game_renderer: None,
             screen_manager: ScreenManager::new(),
             debug_renderer: None,
-            egui_context: egui::Context::default(),
-            egui_state: None,
             performance: PerformanceCounter::new(),
             frame_timing: FrameTiming::new(now),
             debug_visible: true,
@@ -100,14 +95,6 @@ impl App {
 
         self.game_renderer = Some(pollster::block_on(GameRenderer::new(game_window)));
         self.debug_renderer = Some(pollster::block_on(DebugRenderer::new(debug_window)));
-        self.egui_state = Some(egui_winit::State::new(
-            self.egui_context.clone(),
-            egui::ViewportId::ROOT,
-            debug_window,
-            Some(debug_window.scale_factor() as f32),
-            debug_window.theme(),
-            None,
-        ));
         self.game_window = Some(game_window);
         self.debug_window = Some(debug_window);
     }
@@ -141,8 +128,8 @@ impl App {
     }
 
     fn handle_debug_event(&mut self, event_loop: &ActiveEventLoop, event: WindowEvent) {
-        if let (Some(window), Some(state)) = (self.debug_window, self.egui_state.as_mut()) {
-            let _ = state.on_window_event(window, &event);
+        if let (Some(window), Some(renderer)) = (self.debug_window, self.debug_renderer.as_mut()) {
+            renderer.handle_window_event(window, &event);
         }
 
         match event {
@@ -160,17 +147,13 @@ impl App {
             }
             WindowEvent::RedrawRequested if self.frame_timing.debug_render_pending => {
                 self.frame_timing.debug_render_pending = false;
-                if let (Some(renderer), Some(window), Some(state)) = (
-                    self.debug_renderer.as_mut(),
-                    self.debug_window,
-                    self.egui_state.as_mut(),
-                ) {
+                if let (Some(renderer), Some(window)) =
+                    (self.debug_renderer.as_mut(), self.debug_window)
+                {
                     let main_window_size =
                         self.game_window.map(Window::inner_size).unwrap_or_default();
                     let _ = renderer.render(
                         window,
-                        &self.egui_context,
-                        state,
                         &self.performance,
                         self.screen_manager.current_screen_name(),
                         main_window_size,
