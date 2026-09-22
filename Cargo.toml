@@ -2,7 +2,7 @@
 resolver = "3"
 members = [
     "crates/app",
-    "crates/debug",
+    "crates/debug_window",
     "crates/play_core"
 ]
 
