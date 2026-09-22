@@ -1,0 +1,93 @@
+use crate::{
+    app::{AppState, RENDER_PERIOD},
+    loop_manager::LoopManager,
+};
+use debug::DebugRenderer;
+use std::time::Instant;
+use winit::{event::WindowEvent, event_loop::ActiveEventLoop, window::Window};
+const DEBUG_WINDOW_TITLE: &str = "wakamore: debug";
+
+pub struct DebugWindow {
+    pub window: &'static Window,
+    renderer: DebugRenderer,
+    render_loop: LoopManager,
+    visible: bool,
+}
+
+impl DebugWindow {
+    pub fn initialize(event_loop: &ActiveEventLoop) -> Self {
+        let debug_window: &'static Window = Box::leak(Box::new(
+            event_loop
+                .create_window(
+                    Window::default_attributes()
+                        .with_title(DEBUG_WINDOW_TITLE)
+                        .with_inner_size(winit::dpi::PhysicalSize::new(360, 240))
+                        .with_active(false),
+                )
+                .expect("デバッグウィンドウの作成に失敗しました"),
+        ));
+
+        let debug_renderer = pollster::block_on(DebugRenderer::new(debug_window));
+        DebugWindow {
+            window: debug_window,
+            renderer: debug_renderer,
+            render_loop: LoopManager::new(Instant::now(), RENDER_PERIOD),
+            visible: true,
+        }
+    }
+
+    pub fn toggle_visibility(&mut self) {
+        self.visible = !self.visible;
+        self.window.set_visible(self.visible);
+        if self.visible {
+            self.window.request_redraw();
+        }
+    }
+
+    pub fn handle_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        event: &WindowEvent,
+        app_state: &AppState,
+    ) {
+        self.renderer.handle_window_event(self.window, event);
+        match event {
+            WindowEvent::CloseRequested => self.handle_window_close(),
+            WindowEvent::Resized(size) => self.renderer.resize(size.clone()),
+            WindowEvent::RedrawRequested => self.handle_window_redraw(app_state),
+            _ => {}
+        }
+
+        let _ = event_loop;
+    }
+
+    fn handle_window_close(&mut self) {
+        self.visible = false;
+        self.render_loop.render_set_pending(false);
+        self.window.set_visible(false);
+    }
+
+    fn handle_window_redraw(&mut self, app_state: &AppState) {
+        if self.render_loop.render_is_pending() {
+            self.render_loop.render_set_pending(false);
+            let main_window_size = self.window.inner_size();
+            let _ = self.renderer.render(
+                self.window,
+                &app_state.performance,
+                app_state.screen_manager.current_screen_name(),
+                main_window_size,
+            );
+        }
+    }
+
+    pub fn about_to_wait(&mut self, now: Instant) {
+        if !self.visible {
+            return;
+        }
+        self.render_loop.update_loop_state(now);
+        if !self.render_loop.render_is_pending() {
+            self.render_loop.render_set_pending(true);
+            self.window.request_redraw();
+        }
+    }
+}

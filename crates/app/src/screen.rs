@@ -1,4 +1,4 @@
-use crate::game_renderer::{GameRenderState, GameRenderer};
+use crate::game_renderer::GameRenderState;
 use winit::event::{ElementState, WindowEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
 
@@ -40,8 +40,8 @@ impl ScreenManager {
         self.apply(command);
     }
 
-    pub fn render(&self, renderer: &mut GameRenderer) -> bool {
-        renderer.render(self.current.render_state())
+    pub fn render_state(&self) -> GameRenderState {
+        self.current.render_state()
     }
 
     pub fn current_screen_name(&self) -> &'static str {

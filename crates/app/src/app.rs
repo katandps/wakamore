@@ -1,6 +1,8 @@
+use crate::debug_window::DebugWindow;
+use crate::main_window::MainWindow;
+use crate::screen::ScreenCommand;
 use crate::screen::ScreenManager;
-use crate::{game_renderer::GameRenderer, screen::ScreenCommand};
-use debug::{DebugRenderer, PerformanceCounter};
+use debug::PerformanceCounter;
 use play_core::{KeyPressed, KeyReleased, PlayCore, PlayEvent};
 use std::time::Instant;
 use winit::{
@@ -8,10 +10,8 @@ use winit::{
     event::{ElementState, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
-    window::{Window, WindowId},
+    window::WindowId,
 };
-const GAME_WINDOW_TITLE: &str = "wakamore: game";
-const DEBUG_WINDOW_TITLE: &str = "wakamore: debug";
 
 use crate::loop_manager::LoopManager;
 use std::time::Duration;
@@ -26,149 +26,10 @@ pub struct App {
     main_loop: LoopManager,
 }
 
-struct AppState {
-    screen_manager: ScreenManager,
-    performance: PerformanceCounter,
+pub struct AppState {
+    pub screen_manager: ScreenManager,
+    pub performance: PerformanceCounter,
     play_core: PlayCore,
-}
-
-struct MainWindow {
-    window: &'static Window,
-    renderer: GameRenderer,
-    render_loop: LoopManager,
-}
-
-impl MainWindow {
-    pub fn initialize(event_loop: &ActiveEventLoop) -> Self {
-        let game_window: &'static Window = Box::leak(Box::new(
-            event_loop
-                .create_window(Window::default_attributes().with_title(GAME_WINDOW_TITLE))
-                .expect("ゲームウィンドウの作成に失敗しました"),
-        ));
-        let game_lenderer = pollster::block_on(GameRenderer::new(game_window));
-
-        MainWindow {
-            window: game_window,
-            renderer: game_lenderer,
-            render_loop: LoopManager::new(Instant::now(), RENDER_PERIOD),
-        }
-    }
-
-    pub fn handle_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        event: &WindowEvent,
-        app_state: &mut AppState,
-    ) {
-        match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::Resized(size) => self.renderer.resize(size.clone()),
-            WindowEvent::RedrawRequested => self.handle_redraw_requested(app_state),
-            _ => (),
-        }
-    }
-
-    fn handle_redraw_requested(&mut self, app_state: &mut AppState) {
-        if self.render_loop.render_is_pending() {
-            self.render_loop.render_set_pending(false);
-            if app_state.screen_manager.render(&mut self.renderer) {
-                app_state.performance.record_render();
-            }
-        }
-    }
-
-    fn about_to_wait(&mut self, now: Instant) {
-        self.render_loop.update_loop_state(now);
-        if !self.render_loop.render_is_pending() {
-            self.render_loop.render_set_pending(true);
-            self.window.request_redraw();
-        }
-    }
-}
-
-struct DebugWindow {
-    window: &'static Window,
-    renderer: DebugRenderer,
-    render_loop: LoopManager,
-    visible: bool,
-}
-
-impl DebugWindow {
-    pub fn initialize(event_loop: &ActiveEventLoop) -> Self {
-        let debug_window: &'static Window = Box::leak(Box::new(
-            event_loop
-                .create_window(
-                    Window::default_attributes()
-                        .with_title(DEBUG_WINDOW_TITLE)
-                        .with_inner_size(winit::dpi::PhysicalSize::new(360, 240))
-                        .with_active(false),
-                )
-                .expect("デバッグウィンドウの作成に失敗しました"),
-        ));
-
-        let debug_renderer = pollster::block_on(DebugRenderer::new(debug_window));
-        DebugWindow {
-            window: debug_window,
-            renderer: debug_renderer,
-            render_loop: LoopManager::new(Instant::now(), RENDER_PERIOD),
-            visible: true,
-        }
-    }
-
-    pub fn toggle_visibility(&mut self) {
-        self.visible = !self.visible;
-        self.window.set_visible(self.visible);
-        if self.visible {
-            self.window.request_redraw();
-        }
-    }
-
-    fn handle_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        event: &WindowEvent,
-        app_state: &AppState,
-    ) {
-        self.renderer.handle_window_event(self.window, event);
-        match event {
-            WindowEvent::CloseRequested => self.handle_window_close(),
-            WindowEvent::Resized(size) => self.renderer.resize(size.clone()),
-            WindowEvent::RedrawRequested => self.handle_window_redraw(app_state),
-            _ => {}
-        }
-
-        let _ = event_loop;
-    }
-
-    fn handle_window_close(&mut self) {
-        self.visible = false;
-        self.render_loop.render_set_pending(false);
-        self.window.set_visible(false);
-    }
-
-    fn handle_window_redraw(&mut self, app_state: &AppState) {
-        if self.render_loop.render_is_pending() {
-            self.render_loop.render_set_pending(false);
-            let main_window_size = self.window.inner_size();
-            let _ = self.renderer.render(
-                self.window,
-                &app_state.performance,
-                app_state.screen_manager.current_screen_name(),
-                main_window_size,
-            );
-        }
-    }
-
-    fn about_to_wait(&mut self, now: Instant) {
-        if !self.visible {
-            return;
-        }
-        self.render_loop.update_loop_state(now);
-        if !self.render_loop.render_is_pending() {
-            self.render_loop.render_set_pending(true);
-            self.window.request_redraw();
-        }
-    }
 }
 
 impl App {
