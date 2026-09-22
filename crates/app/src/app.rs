@@ -1,6 +1,7 @@
 use crate::game_renderer::GameRenderer;
 use crate::screen::{ScreenCommand, ScreenManager};
 use debug::{DebugRenderer, PerformanceCounter};
+use play_core::{KeyPressed, PlayCore, PlayEvent};
 use std::time::Instant;
 use winit::{
     application::ApplicationHandler,
@@ -29,6 +30,7 @@ pub struct App {
     main_loop: LoopManager,
     render_loop: LoopManager,
     debug_loop: LoopManager,
+    play_core: PlayCore,
     debug_visible: bool,
 }
 
@@ -44,6 +46,7 @@ impl App {
             main_loop: LoopManager::new(Instant::now(), MAIN_LOOP_PERIOD),
             render_loop: LoopManager::new(Instant::now(), RENDER_PERIOD),
             debug_loop: LoopManager::new(Instant::now(), RENDER_PERIOD),
+            play_core: PlayCore::default(),
             debug_visible: true,
         }
     }
@@ -93,12 +96,16 @@ impl App {
                     renderer.resize(size);
                 }
             }
-            WindowEvent::KeyboardInput { event, .. }
+            WindowEvent::KeyboardInput { event, .. } => {
                 if event.state == ElementState::Pressed
-                    && event.physical_key == PhysicalKey::Code(KeyCode::F12) =>
-            {
-                self.toggle_debug_window();
+                    && event.physical_key == PhysicalKey::Code(KeyCode::F12)
+                {
+                    self.toggle_debug_window();
+                }
+                let key_event = PlayEvent::KeyPressed(KeyPressed::Key1);
+                self.play_core.receive_event(key_event);
             }
+
             WindowEvent::RedrawRequested if self.render_loop.render_is_pending() => {
                 self.render_loop.render_set_pending(false);
                 if let Some(renderer) = self.game_renderer.as_mut()
@@ -153,7 +160,7 @@ impl App {
     }
 }
 
-impl ApplicationHandler for App {
+impl ApplicationHandler<PlayEvent> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         self.create_windows(event_loop);
     }
@@ -169,6 +176,10 @@ impl ApplicationHandler for App {
         } else if self.debug_window.map(Window::id) == Some(window_id) {
             self.handle_debug_event(event_loop, event);
         }
+    }
+
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: PlayEvent) {
+        self.play_core.receive_event(event);
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
@@ -201,7 +212,10 @@ impl ApplicationHandler for App {
 }
 
 pub fn run() {
-    let event_loop = EventLoop::new().expect("イベントループの作成に失敗しました");
+    env_logger::init();
+    let event_loop = EventLoop::<PlayEvent>::with_user_event()
+        .build()
+        .expect("イベントループの作成に失敗しました");
     event_loop.set_control_flow(ControlFlow::Wait);
     event_loop
         .run_app(&mut App::new())

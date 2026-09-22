@@ -1,14 +1,19 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+#[derive(Default)]
+pub struct PlayCore {}
+
+impl PlayCore {
+    pub fn receive_event(&mut self, event: PlayEvent) {
+        log::info!("Received event: {:?}", event);
+        // Handle the received event here
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[derive(Debug)]
+pub enum PlayEvent {
+    KeyPressed(KeyPressed),
+}
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+#[derive(Debug)]
+pub enum KeyPressed {
+    Key1,
 }

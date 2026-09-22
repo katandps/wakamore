@@ -10,5 +10,7 @@ wgpu = { version = "30.0.1", default-features = false, features = ["gles", "wgsl
 winit = "0.30.13"
 
 log.workspace = true
+env_logger = "0.11.11"
 
 debug = { path = "../debug" }
+play_core = { path = "../play_core" }
