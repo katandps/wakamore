@@ -1,7 +1,7 @@
 use crate::game_renderer::GameRenderer;
 use crate::screen::{ScreenCommand, ScreenManager};
 use debug::{DebugRenderer, PerformanceCounter};
-use play_core::{KeyPressed, PlayCore, PlayEvent};
+use play_core::{KeyPressed, KeyReleased, PlayCore, PlayEvent};
 use std::time::Instant;
 use winit::{
     application::ApplicationHandler,
@@ -102,8 +102,15 @@ impl App {
                 {
                     self.toggle_debug_window();
                 }
-                let key_event = PlayEvent::KeyPressed(KeyPressed::Key1);
-                self.play_core.receive_event(key_event);
+                if !event.repeat {
+                    if event.state == ElementState::Pressed {
+                        let key_event = PlayEvent::KeyPressed(KeyPressed::Key1);
+                        self.play_core.receive_event(key_event);
+                    } else if event.state == ElementState::Released {
+                        let key_event = PlayEvent::KeyReleased(KeyReleased::Key1);
+                        self.play_core.receive_event(key_event);
+                    }
+                }
             }
 
             WindowEvent::RedrawRequested if self.render_loop.render_is_pending() => {

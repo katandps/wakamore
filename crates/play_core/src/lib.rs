@@ -11,9 +11,15 @@ impl PlayCore {
 #[derive(Debug)]
 pub enum PlayEvent {
     KeyPressed(KeyPressed),
+    KeyReleased(KeyReleased),
 }
 
 #[derive(Debug)]
 pub enum KeyPressed {
+    Key1,
+}
+
+#[derive(Debug)]
+pub enum KeyReleased {
     Key1,
 }
