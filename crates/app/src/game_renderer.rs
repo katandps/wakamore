@@ -1,3 +1,4 @@
+use std::time::Instant;
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
@@ -5,12 +6,13 @@ use winit::window::Window;
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
     position: [f32; 2],
-    color: [f32; 3],
+    texture_coordinates: [f32; 2],
+    opacity: f32,
 }
 
 impl Vertex {
-    const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x3];
+    const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
+        wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Float32];
 
     fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
@@ -21,56 +23,52 @@ impl Vertex {
     }
 }
 
-const VERTICES: &[Vertex] = &[
-    Vertex {
-        position: [-0.85, 0.55],
-        color: [0.15, 0.75, 0.95],
-    },
-    Vertex {
-        position: [-0.15, 0.55],
-        color: [0.15, 0.75, 0.95],
-    },
-    Vertex {
-        position: [-0.85, -0.55],
-        color: [0.15, 0.75, 0.95],
-    },
-    Vertex {
-        position: [-0.15, 0.55],
-        color: [0.15, 0.75, 0.95],
-    },
-    Vertex {
-        position: [-0.15, -0.55],
-        color: [0.15, 0.75, 0.95],
-    },
-    Vertex {
-        position: [-0.85, -0.55],
-        color: [0.15, 0.75, 0.95],
-    },
-    Vertex {
-        position: [0.05, 0.82],
-        color: [1.0, 0.42, 0.20],
-    },
-    Vertex {
-        position: [0.80, 0.25],
-        color: [1.0, 0.42, 0.20],
-    },
-    Vertex {
-        position: [0.05, 0.25],
-        color: [1.0, 0.42, 0.20],
-    },
-    Vertex {
-        position: [0.05, 0.82],
-        color: [1.0, 0.42, 0.20],
-    },
-    Vertex {
-        position: [0.80, 0.82],
-        color: [1.0, 0.42, 0.20],
-    },
-    Vertex {
-        position: [0.80, 0.25],
-        color: [1.0, 0.42, 0.20],
-    },
-];
+const VERTEX_COUNT: u32 = 6;
+const SPRITE_WIDTH: f32 = 0.55;
+const SPRITE_HEIGHT: f32 = 0.55;
+
+fn sprite_vertices(time: f32) -> [Vertex; VERTEX_COUNT as usize] {
+    let x = 0.70 * (time * 0.55).sin();
+    let y = 0.42 * (time * 0.80).sin();
+    let opacity = 0.20 + 0.80 * (0.5 + 0.5 * (time * 1.20).sin());
+    let left = x - SPRITE_WIDTH / 2.0;
+    let right = x + SPRITE_WIDTH / 2.0;
+    let top = y + SPRITE_HEIGHT / 2.0;
+    let bottom = y - SPRITE_HEIGHT / 2.0;
+
+    [
+        Vertex {
+            position: [left, top],
+            texture_coordinates: [0.0, 0.0],
+            opacity,
+        },
+        Vertex {
+            position: [right, top],
+            texture_coordinates: [1.0, 0.0],
+            opacity,
+        },
+        Vertex {
+            position: [left, bottom],
+            texture_coordinates: [0.0, 1.0],
+            opacity,
+        },
+        Vertex {
+            position: [right, top],
+            texture_coordinates: [1.0, 0.0],
+            opacity,
+        },
+        Vertex {
+            position: [right, bottom],
+            texture_coordinates: [1.0, 1.0],
+            opacity,
+        },
+        Vertex {
+            position: [left, bottom],
+            texture_coordinates: [0.0, 1.0],
+            opacity,
+        },
+    ]
+}
 
 pub struct GameRenderer {
     surface: wgpu::Surface<'static>,
@@ -79,6 +77,8 @@ pub struct GameRenderer {
     config: wgpu::SurfaceConfiguration,
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
+    texture_bind_group: wgpu::BindGroup,
+    started_at: Instant,
 }
 
 #[derive(Clone, Copy)]
@@ -99,17 +99,97 @@ impl GameRenderer {
         let config = configure_surface(&surface, &adapter, &device, size);
         let format = config.format;
 
+        let image = image::load_from_memory(include_bytes!("../../../resources/circles.png"))
+            .expect("circles.png の読み込みに失敗しました")
+            .to_rgba8();
+        let image_size = wgpu::Extent3d {
+            width: image.width(),
+            height: image.height(),
+            depth_or_array_layers: 1,
+        };
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("circles texture"),
+            size: image_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &image,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * image.width()),
+                rows_per_image: Some(image.height()),
+            },
+            image_size,
+        );
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("circles sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("circles texture bind group layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
+        let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("circles texture bind group"),
+            layout: &texture_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("2D rectangle shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("2D pipeline layout"),
-            bind_group_layouts: &[],
+            bind_group_layouts: &[Some(&texture_bind_group_layout)],
             immediate_size: 0,
         });
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("2D rectangle pipeline"),
+            label: Some("2D texture pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -122,7 +202,7 @@ impl GameRenderer {
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format,
-                    blend: Some(wgpu::BlendState::REPLACE),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
@@ -134,9 +214,9 @@ impl GameRenderer {
             cache: None,
         });
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("2D rectangle vertices"),
-            contents: bytemuck::cast_slice(VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
+            label: Some("animated sprite vertices"),
+            contents: bytemuck::cast_slice(&sprite_vertices(0.0)),
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
         Self {
@@ -146,6 +226,8 @@ impl GameRenderer {
             config,
             pipeline,
             vertex_buffer,
+            texture_bind_group,
+            started_at: Instant::now(),
         }
     }
 
@@ -159,6 +241,12 @@ impl GameRenderer {
     }
 
     pub fn render(&mut self, state: GameRenderState) -> bool {
+        let elapsed = self.started_at.elapsed().as_secs_f32();
+        self.queue.write_buffer(
+            &self.vertex_buffer,
+            0,
+            bytemuck::cast_slice(&sprite_vertices(elapsed)),
+        );
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
@@ -209,8 +297,9 @@ impl GameRenderer {
                 occlusion_query_set: None,
             });
             pass.set_pipeline(&self.pipeline);
+            pass.set_bind_group(0, &self.texture_bind_group, &[]);
             pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            pass.draw(0..VERTICES.len() as u32, 0..1);
+            pass.draw(0..VERTEX_COUNT, 0..1);
         }
         self.queue.submit(Some(encoder.finish()));
         self.queue.present(frame);

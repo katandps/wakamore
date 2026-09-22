@@ -137,6 +137,7 @@ dependencies = [
  "bytemuck",
  "debug",
  "env_logger",
+ "image",
  "log",
  "play_core",
  "pollster",
