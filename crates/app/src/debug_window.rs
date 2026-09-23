@@ -4,7 +4,7 @@ use crate::{
 };
 use debug::DebugRenderer;
 use std::time::Instant;
-use winit::{event::WindowEvent, event_loop::ActiveEventLoop, window::Window};
+use winit::{dpi::PhysicalSize, event::WindowEvent, event_loop::ActiveEventLoop, window::Window};
 const DEBUG_WINDOW_TITLE: &str = "wakamore: debug";
 
 pub struct DebugWindow {
@@ -49,12 +49,13 @@ impl DebugWindow {
         event_loop: &ActiveEventLoop,
         event: &WindowEvent,
         app_state: &AppState,
+        main_window_size: PhysicalSize<u32>,
     ) {
         self.renderer.handle_window_event(self.window, event);
         match event {
             WindowEvent::CloseRequested => self.handle_window_close(),
             WindowEvent::Resized(size) => self.renderer.resize(size.clone()),
-            WindowEvent::RedrawRequested => self.handle_window_redraw(app_state),
+            WindowEvent::RedrawRequested => self.handle_window_redraw(app_state, main_window_size),
             _ => {}
         }
 
@@ -63,20 +64,19 @@ impl DebugWindow {
 
     fn handle_window_close(&mut self) {
         self.visible = false;
-        self.render_loop.render_set_pending(false);
         self.window.set_visible(false);
     }
 
-    fn handle_window_redraw(&mut self, app_state: &AppState) {
-        if self.render_loop.render_is_pending() {
-            self.render_loop.render_set_pending(false);
-            let main_window_size = self.window.inner_size();
+    fn handle_window_redraw(&mut self, app_state: &AppState, main_window_size: PhysicalSize<u32>) {
+        let now = Instant::now();
+        if self.render_loop.next_loop_is_came(now) {
             let _ = self.renderer.render(
                 self.window,
                 &app_state.performance,
                 app_state.screen_manager.current_screen_name(),
                 main_window_size,
             );
+            self.render_loop.update_loop_state(now);
         }
     }
 
@@ -84,9 +84,7 @@ impl DebugWindow {
         if !self.visible {
             return;
         }
-        self.render_loop.update_loop_state(now);
-        if !self.render_loop.render_is_pending() {
-            self.render_loop.render_set_pending(true);
+        if self.render_loop.next_loop_is_came(now) {
             self.window.request_redraw();
         }
     }

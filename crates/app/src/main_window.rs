@@ -43,21 +43,20 @@ impl MainWindow {
     }
 
     fn handle_redraw_requested(&mut self, app_state: &mut AppState) {
-        if self.render_loop.render_is_pending() {
-            self.render_loop.render_set_pending(false);
+        let now = Instant::now();
+        if self.render_loop.next_loop_is_came(now) {
             if self
                 .renderer
                 .render(app_state.screen_manager.render_state())
             {
                 app_state.performance.record_render();
             }
+            self.render_loop.update_loop_state(now);
         }
     }
 
     pub fn about_to_wait(&mut self, now: Instant) {
-        self.render_loop.update_loop_state(now);
-        if !self.render_loop.render_is_pending() {
-            self.render_loop.render_set_pending(true);
+        if self.render_loop.next_loop_is_came(now) {
             self.window.request_redraw();
         }
     }

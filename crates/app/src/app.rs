@@ -16,8 +16,8 @@ use winit::{
 use crate::loop_manager::LoopManager;
 use std::time::Duration;
 
-pub const MAIN_LOOP_PERIOD: Duration = Duration::from_micros(50);
-pub const RENDER_PERIOD: Duration = Duration::from_nanos(8_333_333);
+pub const MAIN_LOOP_PERIOD: Duration = Duration::from_nanos(1_000_000_000 / 3000);
+pub const RENDER_PERIOD: Duration = Duration::from_nanos(1_000_000_000 / 240);
 
 pub struct App {
     main_window: Option<MainWindow>,
@@ -67,6 +67,23 @@ impl ApplicationHandler<PlayEvent> for App {
         window_id: WindowId,
         event: WindowEvent,
     ) {
+        if let Some(main_window) = self.main_window.as_mut() {
+            if main_window.window.id() == window_id {
+                main_window.handle_event(event_loop, &event, &mut self.app_state);
+            }
+        }
+        if let Some(debug_window) = self.debug_window.as_mut() {
+            if debug_window.window.id() == window_id {
+                debug_window.handle_event(
+                    event_loop,
+                    &event,
+                    &self.app_state,
+                    self.main_window
+                        .as_ref()
+                        .map_or_default(|w| w.window.outer_size()),
+                );
+            }
+        }
         match event {
             // キーボード入力
             WindowEvent::KeyboardInput { event, .. } => {
@@ -90,21 +107,9 @@ impl ApplicationHandler<PlayEvent> for App {
             }
             // マウス入力(まだ実装しない)
             // ゲームパッド入力(まだ実装しない)
-            _ => {
-                if let Some(main_window) = self.main_window.as_mut() {
-                    if main_window.window.id() == window_id {
-                        main_window.handle_event(event_loop, &event, &mut self.app_state);
-                    }
-                }
-                if let Some(debug_window) = self.debug_window.as_mut() {
-                    if debug_window.window.id() == window_id {
-                        debug_window.handle_event(event_loop, &event, &self.app_state);
-                    }
-                }
-                match self.app_state.screen_manager.handle_event(&event) {
-                    ScreenCommand::None | ScreenCommand::Replace(_) => {}
-                }
-            }
+            _ => match self.app_state.screen_manager.handle_event(&event) {
+                ScreenCommand::None | ScreenCommand::Replace(_) => {}
+            },
         }
     }
 
@@ -132,7 +137,7 @@ impl ApplicationHandler<PlayEvent> for App {
             .iter_mut()
             .for_each(|window| window.about_to_wait(now));
 
-        event_loop.set_control_flow(ControlFlow::WaitUntil(self.main_loop.next_wait_deadline()));
+        event_loop.set_control_flow(ControlFlow::WaitUntil(self.main_loop.next_loop_at));
     }
 }
 
@@ -141,7 +146,7 @@ pub fn run() {
     let event_loop = EventLoop::<PlayEvent>::with_user_event()
         .build()
         .expect("イベントループの作成に失敗しました");
-    event_loop.set_control_flow(ControlFlow::Wait);
+    event_loop.set_control_flow(ControlFlow::Poll);
     event_loop
         .run_app(&mut App::new())
         .expect("イベントループの実行に失敗しました");
