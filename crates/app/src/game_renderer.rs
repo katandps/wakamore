@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
@@ -8,6 +8,19 @@ struct Vertex {
     position: [f32; 2],
     texture_coordinates: [f32; 2],
     opacity: f32,
+}
+
+#[derive(Clone, Copy)]
+pub struct Rect<T> {
+    pub position: [T; 2],
+    pub size: [T; 2],
+}
+
+pub struct ImageDrawOptions<'a> {
+    pub path: &'a str,
+    pub source: Rect<u32>,
+    pub destination: Rect<f32>,
+    pub opacity: f32,
 }
 
 impl Vertex {
@@ -24,50 +37,59 @@ impl Vertex {
 }
 
 const VERTEX_COUNT: u32 = 6;
-const SPRITE_WIDTH: f32 = 0.55;
-const SPRITE_HEIGHT: f32 = 0.55;
-
-fn sprite_vertices(time: f32) -> [Vertex; VERTEX_COUNT as usize] {
-    let x = 0.70 * (time * 0.55).sin();
-    let y = 0.42 * (time * 0.80).sin();
-    let opacity = 0.20 + 0.80 * (0.5 + 0.5 * (time * 1.20).sin());
-    let left = x - SPRITE_WIDTH / 2.0;
-    let right = x + SPRITE_WIDTH / 2.0;
-    let top = y + SPRITE_HEIGHT / 2.0;
-    let bottom = y - SPRITE_HEIGHT / 2.0;
+fn image_vertices(
+    options: &ImageDrawOptions,
+    texture_size: [u32; 2],
+) -> [Vertex; VERTEX_COUNT as usize] {
+    let source_left = options.source.position[0] as f32 / texture_size[0] as f32;
+    let source_top = options.source.position[1] as f32 / texture_size[1] as f32;
+    let source_right =
+        (options.source.position[0] + options.source.size[0]) as f32 / texture_size[0] as f32;
+    let source_bottom =
+        (options.source.position[1] + options.source.size[1]) as f32 / texture_size[1] as f32;
+    let left = options.destination.position[0];
+    let top = options.destination.position[1];
+    let right = left + options.destination.size[0];
+    let bottom = top - options.destination.size[1];
+    let opacity = options.opacity.clamp(0.0, 1.0);
 
     [
         Vertex {
             position: [left, top],
-            texture_coordinates: [0.0, 0.0],
+            texture_coordinates: [source_left, source_top],
             opacity,
         },
         Vertex {
             position: [right, top],
-            texture_coordinates: [1.0, 0.0],
+            texture_coordinates: [source_right, source_top],
             opacity,
         },
         Vertex {
             position: [left, bottom],
-            texture_coordinates: [0.0, 1.0],
+            texture_coordinates: [source_left, source_bottom],
             opacity,
         },
         Vertex {
             position: [right, top],
-            texture_coordinates: [1.0, 0.0],
+            texture_coordinates: [source_right, source_top],
             opacity,
         },
         Vertex {
             position: [right, bottom],
-            texture_coordinates: [1.0, 1.0],
+            texture_coordinates: [source_right, source_bottom],
             opacity,
         },
         Vertex {
             position: [left, bottom],
-            texture_coordinates: [0.0, 1.0],
+            texture_coordinates: [source_left, source_bottom],
             opacity,
         },
     ]
+}
+
+struct ImageTexture {
+    bind_group: wgpu::BindGroup,
+    size: [u32; 2],
 }
 
 pub struct GameRenderer {
@@ -77,7 +99,8 @@ pub struct GameRenderer {
     config: wgpu::SurfaceConfiguration,
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
-    texture_bind_group: wgpu::BindGroup,
+    texture_bind_group_layout: wgpu::BindGroupLayout,
+    images: HashMap<String, ImageTexture>,
     started_at: Instant,
 }
 
@@ -99,52 +122,9 @@ impl GameRenderer {
         let config = configure_surface(&surface, &adapter, &device, size);
         let format = config.format;
 
-        let image = image::load_from_memory(include_bytes!("../../../resources/circles.png"))
-            .expect("circles.png の読み込みに失敗しました")
-            .to_rgba8();
-        let image_size = wgpu::Extent3d {
-            width: image.width(),
-            height: image.height(),
-            depth_or_array_layers: 1,
-        };
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("circles texture"),
-            size: image_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            &image,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * image.width()),
-                rows_per_image: Some(image.height()),
-            },
-            image_size,
-        );
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("circles sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("circles texture bind group layout"),
+                label: Some("image texture bind group layout"),
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
@@ -164,20 +144,32 @@ impl GameRenderer {
                     },
                 ],
             });
-        let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("circles texture bind group"),
-            layout: &texture_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-            ],
-        });
+        let initial_options = ImageDrawOptions {
+            path: "resources/circles.png",
+            source: Rect {
+                position: [0, 0],
+                size: [1, 1],
+            },
+            destination: Rect {
+                position: [-0.275, 0.275],
+                size: [0.55, 0.55],
+            },
+            opacity: 1.0,
+        };
+        let initial_texture = load_image_texture(
+            &device,
+            &queue,
+            &texture_bind_group_layout,
+            initial_options.path,
+        );
+        let initial_options = ImageDrawOptions {
+            source: Rect {
+                size: initial_texture.size,
+                ..initial_options.source
+            },
+            ..initial_options
+        };
+        let initial_vertices = image_vertices(&initial_options, initial_texture.size);
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("2D rectangle shader"),
@@ -215,7 +207,7 @@ impl GameRenderer {
         });
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("animated sprite vertices"),
-            contents: bytemuck::cast_slice(&sprite_vertices(0.0)),
+            contents: bytemuck::cast_slice(&initial_vertices),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -226,7 +218,8 @@ impl GameRenderer {
             config,
             pipeline,
             vertex_buffer,
-            texture_bind_group,
+            texture_bind_group_layout,
+            images: HashMap::from([(initial_options.path.to_owned(), initial_texture)]),
             started_at: Instant::now(),
         }
     }
@@ -240,13 +233,42 @@ impl GameRenderer {
         self.surface.configure(&self.device, &self.config);
     }
 
+    fn image_texture(&mut self, path: &str) -> &ImageTexture {
+        if !self.images.contains_key(path) {
+            let image_texture = load_image_texture(
+                &self.device,
+                &self.queue,
+                &self.texture_bind_group_layout,
+                path,
+            );
+            self.images.insert(path.to_owned(), image_texture);
+        }
+        self.images
+            .get(path)
+            .expect("画像テクスチャのキャッシュ取得に失敗しました")
+    }
+
     pub fn render(&mut self, state: GameRenderState) -> bool {
         let elapsed = self.started_at.elapsed().as_secs_f32();
-        self.queue.write_buffer(
-            &self.vertex_buffer,
-            0,
-            bytemuck::cast_slice(&sprite_vertices(elapsed)),
-        );
+        let options = ImageDrawOptions {
+            path: "resources/circles.png",
+            source: Rect {
+                position: [0, 0],
+                size: [80, 80],
+            },
+            destination: Rect {
+                position: [
+                    0.70 * (elapsed * 0.55).sin() - 0.275,
+                    0.42 * (elapsed * 0.80).sin() + 0.275,
+                ],
+                size: [0.55, 0.55],
+            },
+            opacity: 0.20 + 0.80 * (0.5 + 0.5 * (elapsed * 1.20).sin()),
+        };
+        let texture_size = self.image_texture(options.path).size;
+        let vertices = image_vertices(&options, texture_size);
+        self.queue
+            .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
@@ -297,7 +319,15 @@ impl GameRenderer {
                 occlusion_query_set: None,
             });
             pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, &self.texture_bind_group, &[]);
+            pass.set_bind_group(
+                0,
+                &self
+                    .images
+                    .get(options.path)
+                    .expect("画像テクスチャのキャッシュ取得に失敗しました")
+                    .bind_group,
+                &[],
+            );
             pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             pass.draw(0..VERTEX_COUNT, 0..1);
         }
@@ -305,6 +335,74 @@ impl GameRenderer {
         self.queue.present(frame);
         true
     }
+}
+
+fn load_image_texture(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    bind_group_layout: &wgpu::BindGroupLayout,
+    path: &str,
+) -> ImageTexture {
+    let image = image::open(path)
+        .unwrap_or_else(|error| panic!("画像の読み込みに失敗しました ({path}): {error}"))
+        .to_rgba8();
+    let size = [image.width(), image.height()];
+    let image_size = wgpu::Extent3d {
+        width: size[0],
+        height: size[1],
+        depth_or_array_layers: 1,
+    };
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("image texture"),
+        size: image_size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        &image,
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(4 * size[0]),
+            rows_per_image: Some(size[1]),
+        },
+        image_size,
+    );
+    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("image sampler"),
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        address_mode_w: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
+        ..Default::default()
+    });
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("image texture bind group"),
+        layout: bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&texture_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(&sampler),
+            },
+        ],
+    });
+
+    ImageTexture { bind_group, size }
 }
 
 async fn request_adapter(instance: &wgpu::Instance, surface: &wgpu::Surface<'_>) -> wgpu::Adapter {
