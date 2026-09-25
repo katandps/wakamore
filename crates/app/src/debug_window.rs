@@ -1,8 +1,6 @@
-use crate::{
-    app::{AppState, RENDER_PERIOD},
-    loop_manager::LoopManager,
-};
+use crate::app::AppState;
 use debug::DebugRenderer;
+use loop_manager::LoopManager;
 use std::time::Instant;
 use winit::{dpi::PhysicalSize, event::WindowEvent, event_loop::ActiveEventLoop, window::Window};
 const DEBUG_WINDOW_TITLE: &str = "wakamore: debug";
@@ -15,7 +13,7 @@ pub struct DebugWindow {
 }
 
 impl DebugWindow {
-    pub fn initialize(event_loop: &ActiveEventLoop) -> Self {
+    pub fn initialize(event_loop: &ActiveEventLoop, render_loop: LoopManager) -> Self {
         let debug_window: &'static Window = Box::leak(Box::new(
             event_loop
                 .create_window(
@@ -31,7 +29,7 @@ impl DebugWindow {
         DebugWindow {
             window: debug_window,
             renderer: debug_renderer,
-            render_loop: LoopManager::new(Instant::now(), RENDER_PERIOD),
+            render_loop: render_loop,
             visible: true,
         }
     }

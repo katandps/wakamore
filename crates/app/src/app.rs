@@ -3,7 +3,9 @@ use crate::main_window::MainWindow;
 use crate::screen::ScreenCommand;
 use crate::screen::ScreenManager;
 use debug::PerformanceCounter;
+use loop_manager::LoopManager;
 use play_core::{KeyPressed, KeyReleased, PlayCore, PlayEvent};
+use std::time::Duration;
 use std::time::Instant;
 use winit::{
     application::ApplicationHandler,
@@ -12,9 +14,6 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::WindowId,
 };
-
-use crate::loop_manager::LoopManager;
-use std::time::Duration;
 
 pub const MAIN_LOOP_PERIOD: Duration = Duration::from_nanos(1_000_000_000 / 3000);
 pub const RENDER_PERIOD: Duration = Duration::from_nanos(1_000_000_000 / 240);
@@ -51,8 +50,14 @@ impl App {
             return;
         }
 
-        self.main_window = Some(MainWindow::initialize(event_loop));
-        self.debug_window = Some(DebugWindow::initialize(event_loop));
+        self.main_window = Some(MainWindow::initialize(
+            event_loop,
+            LoopManager::new(Instant::now(), RENDER_PERIOD),
+        ));
+        self.debug_window = Some(DebugWindow::initialize(
+            event_loop,
+            LoopManager::new(Instant::now(), RENDER_PERIOD),
+        ));
     }
 }
 

@@ -1,5 +1,5 @@
-use crate::app::RENDER_PERIOD;
-use crate::{app::AppState, game_renderer::GameRenderer, loop_manager::LoopManager};
+use crate::{app::AppState, game_renderer::GameRenderer};
+use loop_manager::LoopManager;
 use std::time::Instant;
 use winit::window::Window;
 use winit::{event::WindowEvent, event_loop::ActiveEventLoop};
@@ -13,7 +13,7 @@ pub struct MainWindow {
 }
 
 impl MainWindow {
-    pub fn initialize(event_loop: &ActiveEventLoop) -> Self {
+    pub fn initialize(event_loop: &ActiveEventLoop, render_loop: LoopManager) -> Self {
         let game_window: &'static Window = Box::leak(Box::new(
             event_loop
                 .create_window(Window::default_attributes().with_title(GAME_WINDOW_TITLE))
@@ -24,7 +24,7 @@ impl MainWindow {
         MainWindow {
             window: game_window,
             renderer: game_lenderer,
-            render_loop: LoopManager::new(Instant::now(), RENDER_PERIOD),
+            render_loop: render_loop,
         }
     }
 
