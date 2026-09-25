@@ -134,15 +134,12 @@ dependencies = [
 name = "app"
 version = "0.1.0"
 dependencies = [
- "bytemuck",
- "debug",
+ "debug_window",
  "env_logger",
- "image",
  "log",
  "loop_manager",
+ "main_window",
  "play_core",
- "pollster",
- "wgpu",
  "winit",
 ]
 
@@ -465,13 +462,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
-name = "debug"
+name = "debug_window"
 version = "0.1.0"
 dependencies = [
  "egui",
  "egui-wgpu",
  "egui-winit",
  "log",
+ "loop_manager",
+ "play_core",
+ "pollster",
  "wgpu",
  "winit",
 ]
@@ -1349,6 +1349,15 @@ version = "0.1.0"
 [[package]]
 name = "main_window"
 version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "image",
+ "loop_manager",
+ "play_core",
+ "pollster",
+ "wgpu",
+ "winit",
+]
 
 [[package]]
 name = "memchr"

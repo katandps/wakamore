@@ -1,5 +1,5 @@
 [package]
-name = "debug"
+name = "debug_window"
 version = "0.1.0"
 edition = "2024"
 
@@ -11,3 +11,7 @@ wgpu = { version = "30.0.1", default-features = false, features = ["gles", "wgsl
 winit = "0.30.13"
 
 log.workspace = true
+pollster.workspace = true
+
+play_core = { path = "../play_core" }
+loop_manager = { path = "../loop_manager" }

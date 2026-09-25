@@ -1,3 +1,6 @@
+pub mod performance;
+pub use crate::performance::PerformanceCounter;
+
 #[derive(Default)]
 pub struct PlayCore {}
 
@@ -24,4 +27,18 @@ pub enum KeyPressed {
 pub enum KeyReleased {
     Key1,
     ToggleDebugWindow,
+}
+
+pub struct AppState {
+    pub screen_manager: GameMode,
+    pub performance: PerformanceCounter,
+    pub play_core: PlayCore,
+}
+
+pub struct GameMode;
+
+impl GameMode {
+    pub fn current_screen_name(&self) -> &str {
+        "MainScreen"
+    }
 }

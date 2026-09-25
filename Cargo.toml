@@ -2,9 +2,13 @@
 resolver = "3"
 members = [
     "crates/app",
-    "crates/debug_window", "crates/loop_manager", "crates/main_window",
+    "crates/debug_window",
+    "crates/loop_manager",
+    "crates/main_window",
     "crates/play_core"
 ]
 
 [workspace.dependencies]
 log = "0.4.34"
+pollster = "1.0.1"
+winit = "0.30.13"

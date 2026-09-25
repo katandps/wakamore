@@ -1,6 +1,6 @@
-use crate::performance::PerformanceCounter;
 use egui_wgpu::{Renderer, RendererOptions, ScreenDescriptor};
 use egui_winit::State as EguiState;
+use play_core::performance::PerformanceCounter;
 use winit::event::WindowEvent;
 use winit::window::Window;
 

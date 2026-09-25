@@ -104,12 +104,6 @@ pub struct GameRenderer {
     started_at: Instant,
 }
 
-#[derive(Clone, Copy)]
-pub enum GameRenderState {
-    Title,
-    Gameplay,
-}
-
 impl GameRenderer {
     pub async fn new(window: &'static Window) -> Self {
         let size = window.inner_size();
@@ -145,7 +139,7 @@ impl GameRenderer {
                 ],
             });
         let initial_options = ImageDrawOptions {
-            path: "resources/circles.png",
+            path: "../resources/circles.png",
             source: Rect {
                 position: [0, 0],
                 size: [1, 1],
@@ -248,10 +242,10 @@ impl GameRenderer {
             .expect("画像テクスチャのキャッシュ取得に失敗しました")
     }
 
-    pub fn render(&mut self, state: GameRenderState) -> bool {
+    pub fn render(&mut self) -> bool {
         let elapsed = self.started_at.elapsed().as_secs_f32();
         let options = ImageDrawOptions {
-            path: "resources/circles.png",
+            path: "../resources/circles.png",
             source: Rect {
                 position: [0, 0],
                 size: [80, 80],
@@ -296,19 +290,11 @@ impl GameRenderer {
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(match state {
-                            GameRenderState::Title => wgpu::Color {
-                                r: 0.03,
-                                g: 0.05,
-                                b: 0.10,
-                                a: 1.0,
-                            },
-                            GameRenderState::Gameplay => wgpu::Color {
-                                r: 0.02,
-                                g: 0.12,
-                                b: 0.08,
-                                a: 1.0,
-                            },
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.03,
+                            g: 0.05,
+                            b: 0.10,
+                            a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
                     },

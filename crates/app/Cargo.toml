@@ -4,15 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bytemuck = { version = "1.23", features = ["derive"] }
-image = { version = "0.25.10", default-features = false, features = ["png"] }
-pollster = "1.0.1"
-wgpu = { version = "30.0.1", default-features = false, features = ["gles", "wgsl"] }
-winit = "0.30.13"
-
 log.workspace = true
+winit.workspace = true
+
 env_logger = "0.11.11"
 
-debug = { path = "../debug_window" }
 loop_manager = { path = "../loop_manager" }
 play_core = { path = "../play_core" }
+debug_window = { path = "../debug_window" }
+main_window = { path = "../main_window" }

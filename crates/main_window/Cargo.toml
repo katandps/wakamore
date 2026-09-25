@@ -4,3 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+bytemuck = { version = "1.23", features = ["derive"] }
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+wgpu = { version = "30.0.1", default-features = false, features = ["gles", "wgsl"] }
+
+winit.workspace = true
+pollster.workspace = true
+
+loop_manager = { path = "../loop_manager" }
+play_core = { path = "../play_core" }
