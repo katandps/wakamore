@@ -31,7 +31,7 @@ impl MainWindow {
             window: game_window,
             renderer: game_renderer,
             content: GameContent::new(),
-            render_loop: render_loop,
+            render_loop,
         }
     }
 
@@ -43,7 +43,7 @@ impl MainWindow {
     ) {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::Resized(size) => self.renderer.resize(size.clone()),
+            WindowEvent::Resized(size) => self.renderer.resize(*size),
             WindowEvent::RedrawRequested => self.handle_redraw_requested(app_state),
             _ => (),
         }
@@ -53,7 +53,13 @@ impl MainWindow {
         let now = Instant::now();
         if self.render_loop.next_loop_is_came(now) {
             let options = self.content.draw_options();
-            if self.renderer.render(&options) {
+            let rendered = if let Some(mut frame) = self.renderer.begin_frame() {
+                frame.draw_image(&options);
+                frame.end_frame()
+            } else {
+                false
+            };
+            if rendered {
                 app_state.performance.record_render();
             }
             self.render_loop.update_loop_state(now);

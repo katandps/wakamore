@@ -32,7 +32,7 @@ impl DebugWindow {
         DebugWindow {
             window: debug_window,
             renderer: debug_renderer,
-            render_loop: render_loop,
+            render_loop,
             visible: true,
         }
     }
@@ -55,7 +55,7 @@ impl DebugWindow {
         self.renderer.handle_window_event(self.window, event);
         match event {
             WindowEvent::CloseRequested => self.handle_window_close(),
-            WindowEvent::Resized(size) => self.renderer.resize(size.clone()),
+            WindowEvent::Resized(size) => self.renderer.resize(*size),
             WindowEvent::RedrawRequested => self.handle_window_redraw(app_state, main_window_size),
             _ => {}
         }

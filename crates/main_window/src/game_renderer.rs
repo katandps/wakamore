@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use wgpu::util::DeviceExt;
 use winit::window::Window;
 
 #[repr(C)]
@@ -97,9 +98,16 @@ pub struct GameRenderer {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
     texture_bind_group_layout: wgpu::BindGroupLayout,
     images: HashMap<String, ImageTexture>,
+}
+
+pub struct GameFrame<'a> {
+    renderer: &'a mut GameRenderer,
+    frame: wgpu::SurfaceTexture,
+    view: wgpu::TextureView,
+    encoder: wgpu::CommandEncoder,
+    images: Vec<(String, [Vertex; VERTEX_COUNT as usize])>,
 }
 
 impl GameRenderer {
@@ -170,20 +178,12 @@ impl GameRenderer {
             multiview_mask: None,
             cache: None,
         });
-        let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("image vertices"),
-            size: (std::mem::size_of::<Vertex>() * VERTEX_COUNT as usize) as wgpu::BufferAddress,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
         Self {
             surface,
             device,
             queue,
             config,
             pipeline,
-            vertex_buffer,
             texture_bind_group_layout,
             images: HashMap::new(),
         }
@@ -213,30 +213,64 @@ impl GameRenderer {
             .expect("画像テクスチャのキャッシュ取得に失敗しました")
     }
 
-    pub fn render(&mut self, options: &ImageDrawOptions<'_>) -> bool {
-        let texture_size = self.image_texture(options.path).size;
-        let vertices = image_vertices(&options, texture_size);
-        self.queue
-            .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
+    pub fn begin_frame(&mut self) -> Option<GameFrame<'_>> {
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
             wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
                 self.surface.configure(&self.device, &self.config);
-                return false;
+                return None;
             }
             wgpu::CurrentSurfaceTexture::Timeout
             | wgpu::CurrentSurfaceTexture::Occluded
-            | wgpu::CurrentSurfaceTexture::Validation => return false,
+            | wgpu::CurrentSurfaceTexture::Validation => return None,
         };
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-        let mut encoder = self
+        let encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("2D render encoder"),
             });
+
+        Some(GameFrame {
+            renderer: self,
+            frame,
+            view,
+            encoder,
+            images: Vec::new(),
+        })
+    }
+}
+
+impl GameFrame<'_> {
+    pub fn draw_image(&mut self, options: &ImageDrawOptions<'_>) {
+        let texture_size = self.renderer.image_texture(options.path).size;
+        let vertices = image_vertices(options, texture_size);
+        self.images.push((options.path.to_owned(), vertices));
+    }
+
+    pub fn end_frame(self) -> bool {
+        let GameFrame {
+            renderer,
+            frame,
+            view,
+            mut encoder,
+            images,
+        } = self;
+        let vertices: Vec<Vertex> = images
+            .iter()
+            .flat_map(|(_, vertices)| vertices.iter().copied())
+            .collect();
+        let vertex_buffer = renderer
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("image vertices"),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("2D render pass"),
@@ -254,21 +288,25 @@ impl GameRenderer {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(
-                0,
-                &self
-                    .images
-                    .get(options.path)
-                    .expect("画像テクスチャのキャッシュ取得に失敗しました")
-                    .bind_group,
-                &[],
-            );
-            pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            pass.draw(0..VERTEX_COUNT, 0..1);
+            pass.set_pipeline(&renderer.pipeline);
+            for (index, (path, _)) in images.iter().enumerate() {
+                pass.set_bind_group(
+                    0,
+                    &renderer
+                        .images
+                        .get(path)
+                        .expect("画像テクスチャのキャッシュ取得に失敗しました")
+                        .bind_group,
+                    &[],
+                );
+                let offset = (index * VERTEX_COUNT as usize * std::mem::size_of::<Vertex>())
+                    as wgpu::BufferAddress;
+                pass.set_vertex_buffer(0, vertex_buffer.slice(offset..));
+                pass.draw(0..VERTEX_COUNT, 0..1);
+            }
         }
-        self.queue.submit(Some(encoder.finish()));
-        self.queue.present(frame);
+        renderer.queue.submit(Some(encoder.finish()));
+        renderer.queue.present(frame);
         true
     }
 }

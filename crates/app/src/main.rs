@@ -66,48 +66,45 @@ impl ApplicationHandler<PlayEvent> for App {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        if let Some(main_window) = self.main_window.as_mut() {
-            if main_window.window.id() == window_id {
-                main_window.handle_event(event_loop, &event, &mut self.app_state);
-            }
+        if let Some(main_window) = self.main_window.as_mut()
+            && main_window.window.id() == window_id
+        {
+            main_window.handle_event(event_loop, &event, &mut self.app_state);
         }
-        if let Some(debug_window) = self.debug_window.as_mut() {
-            if debug_window.window.id() == window_id {
-                debug_window.handle_event(
-                    event_loop,
-                    &event,
-                    &self.app_state,
-                    self.main_window
-                        .as_ref()
-                        .map_or_default(|w| w.window.outer_size()),
-                );
-            }
+        if let Some(debug_window) = self.debug_window.as_mut()
+            && debug_window.window.id() == window_id
+        {
+            debug_window.handle_event(
+                event_loop,
+                &event,
+                &self.app_state,
+                self.main_window
+                    .as_ref()
+                    .map_or_default(|w| w.window.outer_size()),
+            );
         }
-        match event {
-            // キーボード入力
-            WindowEvent::KeyboardInput { event, .. } => {
-                if !event.repeat {
-                    if event.state == ElementState::Pressed {
-                        let key_event = match event.physical_key {
-                            PhysicalKey::Code(KeyCode::F12) => PlayEvent::None,
-                            _ => PlayEvent::KeyPressed(KeyPressed::Key1),
-                        };
-                        self.user_event(event_loop, key_event);
-                    } else if event.state == ElementState::Released {
-                        let key_event = match event.physical_key {
-                            PhysicalKey::Code(KeyCode::F12) => {
-                                PlayEvent::KeyReleased(KeyReleased::ToggleDebugWindow)
-                            }
-                            _ => PlayEvent::KeyReleased(KeyReleased::Key1),
-                        };
-                        self.user_event(event_loop, key_event);
+        // キーボード入力
+        if let WindowEvent::KeyboardInput { event, .. } = event
+            && !event.repeat
+        {
+            if event.state == ElementState::Pressed {
+                let key_event = match event.physical_key {
+                    PhysicalKey::Code(KeyCode::F12) => PlayEvent::None,
+                    _ => PlayEvent::KeyPressed(KeyPressed::Key1),
+                };
+                self.user_event(event_loop, key_event);
+            } else if event.state == ElementState::Released {
+                let key_event = match event.physical_key {
+                    PhysicalKey::Code(KeyCode::F12) => {
+                        PlayEvent::KeyReleased(KeyReleased::ToggleDebugWindow)
                     }
-                }
+                    _ => PlayEvent::KeyReleased(KeyReleased::Key1),
+                };
+                self.user_event(event_loop, key_event);
             }
-            // マウス入力(まだ実装しない)
-            // ゲームパッド入力(まだ実装しない)
-            _ => (),
         }
+        // マウス入力(まだ実装しない)
+        // ゲームパッド入力(まだ実装しない)
     }
 
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: PlayEvent) {
