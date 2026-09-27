@@ -140,6 +140,7 @@ dependencies = [
  "loop_manager",
  "main_window",
  "play_core",
+ "pollster",
  "winit",
 ]
 
@@ -471,7 +472,6 @@ dependencies = [
  "log",
  "loop_manager",
  "play_core",
- "pollster",
  "wgpu",
  "winit",
 ]
@@ -1354,7 +1354,6 @@ dependencies = [
  "image",
  "loop_manager",
  "play_core",
- "pollster",
  "wgpu",
  "winit",
 ]

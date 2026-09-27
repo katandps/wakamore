@@ -16,7 +16,7 @@ pub struct DebugWindow {
 }
 
 impl DebugWindow {
-    pub fn initialize(event_loop: &ActiveEventLoop, render_loop: LoopManager) -> Self {
+    pub async fn initialize(event_loop: &ActiveEventLoop, render_loop: LoopManager) -> Self {
         let debug_window: &'static Window = Box::leak(Box::new(
             event_loop
                 .create_window(
@@ -28,7 +28,7 @@ impl DebugWindow {
                 .expect("デバッグウィンドウの作成に失敗しました"),
         ));
 
-        let debug_renderer = pollster::block_on(DebugRenderer::new(debug_window));
+        let debug_renderer = DebugRenderer::new(debug_window).await;
         DebugWindow {
             window: debug_window,
             renderer: debug_renderer,

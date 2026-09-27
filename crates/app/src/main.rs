@@ -44,14 +44,14 @@ impl App {
             return;
         }
 
-        self.main_window = Some(MainWindow::initialize(
+        self.main_window = Some(pollster::block_on(MainWindow::initialize(
             event_loop,
             LoopManager::new(Instant::now(), RENDER_PERIOD),
-        ));
-        self.debug_window = Some(DebugWindow::initialize(
+        )));
+        self.debug_window = Some(pollster::block_on(DebugWindow::initialize(
             event_loop,
             LoopManager::new(Instant::now(), RENDER_PERIOD),
-        ));
+        )));
     }
 }
 

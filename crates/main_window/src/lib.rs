@@ -19,17 +19,17 @@ pub struct MainWindow {
 }
 
 impl MainWindow {
-    pub fn initialize(event_loop: &ActiveEventLoop, render_loop: LoopManager) -> Self {
+    pub async fn initialize(event_loop: &ActiveEventLoop, render_loop: LoopManager) -> Self {
         let game_window: &'static Window = Box::leak(Box::new(
             event_loop
                 .create_window(Window::default_attributes().with_title(GAME_WINDOW_TITLE))
                 .expect("ゲームウィンドウの作成に失敗しました"),
         ));
-        let game_lenderer = pollster::block_on(GameRenderer::new(game_window));
+        let game_renderer = GameRenderer::new(game_window).await;
 
         MainWindow {
             window: game_window,
-            renderer: game_lenderer,
+            renderer: game_renderer,
             content: GameContent::new(),
             render_loop: render_loop,
         }
