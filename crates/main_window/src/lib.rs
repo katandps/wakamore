@@ -1,5 +1,6 @@
 mod game_content;
 mod game_renderer;
+mod renderer;
 
 use crate::game_content::GameContent;
 use crate::game_renderer::GameRenderer;

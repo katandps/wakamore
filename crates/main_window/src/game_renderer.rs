@@ -2,26 +2,9 @@ use std::collections::HashMap;
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
-    position: [f32; 2],
-    texture_coordinates: [f32; 2],
-    opacity: f32,
-}
+use crate::renderer::image::{IMAGE_VERTEX_COUNT, ImageDrawOptions, ImageVertex};
 
-#[derive(Clone, Copy)]
-pub struct Rect<T> {
-    pub position: [T; 2],
-    pub size: [T; 2],
-}
-
-pub struct ImageDrawOptions<'a> {
-    pub path: &'a str,
-    pub source: Rect<u32>,
-    pub destination: Rect<f32>,
-    pub opacity: f32,
-}
+type Vertex = ImageVertex;
 
 impl Vertex {
     const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
@@ -34,57 +17,6 @@ impl Vertex {
             attributes: &Self::ATTRIBUTES,
         }
     }
-}
-
-const VERTEX_COUNT: u32 = 6;
-fn image_vertices(
-    options: &ImageDrawOptions,
-    texture_size: [u32; 2],
-) -> [Vertex; VERTEX_COUNT as usize] {
-    let source_left = options.source.position[0] as f32 / texture_size[0] as f32;
-    let source_top = options.source.position[1] as f32 / texture_size[1] as f32;
-    let source_right =
-        (options.source.position[0] + options.source.size[0]) as f32 / texture_size[0] as f32;
-    let source_bottom =
-        (options.source.position[1] + options.source.size[1]) as f32 / texture_size[1] as f32;
-    let left = options.destination.position[0];
-    let top = options.destination.position[1];
-    let right = left + options.destination.size[0];
-    let bottom = top - options.destination.size[1];
-    let opacity = options.opacity.clamp(0.0, 1.0);
-
-    [
-        Vertex {
-            position: [left, top],
-            texture_coordinates: [source_left, source_top],
-            opacity,
-        },
-        Vertex {
-            position: [right, top],
-            texture_coordinates: [source_right, source_top],
-            opacity,
-        },
-        Vertex {
-            position: [left, bottom],
-            texture_coordinates: [source_left, source_bottom],
-            opacity,
-        },
-        Vertex {
-            position: [right, top],
-            texture_coordinates: [source_right, source_top],
-            opacity,
-        },
-        Vertex {
-            position: [right, bottom],
-            texture_coordinates: [source_right, source_bottom],
-            opacity,
-        },
-        Vertex {
-            position: [left, bottom],
-            texture_coordinates: [source_left, source_bottom],
-            opacity,
-        },
-    ]
 }
 
 struct ImageTexture {
@@ -107,7 +39,7 @@ pub struct GameFrame<'a> {
     frame: wgpu::SurfaceTexture,
     view: wgpu::TextureView,
     encoder: wgpu::CommandEncoder,
-    images: Vec<(String, [Vertex; VERTEX_COUNT as usize])>,
+    images: Vec<(String, [Vertex; IMAGE_VERTEX_COUNT])>,
 }
 
 impl GameRenderer {
@@ -246,9 +178,9 @@ impl GameRenderer {
 
 impl GameFrame<'_> {
     pub fn draw_image(&mut self, options: &ImageDrawOptions<'_>) {
-        let texture_size = self.renderer.image_texture(options.path).size;
-        let vertices = image_vertices(options, texture_size);
-        self.images.push((options.path.to_owned(), vertices));
+        let texture_size = self.renderer.image_texture(options.src_path()).size;
+        let vertices = options.vertices(texture_size);
+        self.images.push((options.src_path().to_owned(), vertices));
     }
 
     pub fn end_frame(self) -> bool {
@@ -299,10 +231,10 @@ impl GameFrame<'_> {
                         .bind_group,
                     &[],
                 );
-                let offset = (index * VERTEX_COUNT as usize * std::mem::size_of::<Vertex>())
+                let offset = (index * IMAGE_VERTEX_COUNT * std::mem::size_of::<Vertex>())
                     as wgpu::BufferAddress;
                 pass.set_vertex_buffer(0, vertex_buffer.slice(offset..));
-                pass.draw(0..VERTEX_COUNT, 0..1);
+                pass.draw(0..IMAGE_VERTEX_COUNT as u32, 0..1);
             }
         }
         renderer.queue.submit(Some(encoder.finish()));
