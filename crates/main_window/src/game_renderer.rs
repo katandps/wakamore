@@ -1,5 +1,4 @@
-use std::{collections::HashMap, time::Instant};
-use wgpu::util::DeviceExt;
+use std::collections::HashMap;
 use winit::window::Window;
 
 #[repr(C)]
@@ -101,7 +100,6 @@ pub struct GameRenderer {
     vertex_buffer: wgpu::Buffer,
     texture_bind_group_layout: wgpu::BindGroupLayout,
     images: HashMap<String, ImageTexture>,
-    started_at: Instant,
 }
 
 impl GameRenderer {
@@ -138,33 +136,6 @@ impl GameRenderer {
                     },
                 ],
             });
-        let initial_options = ImageDrawOptions {
-            path: "../resources/circles.png",
-            source: Rect {
-                position: [0, 0],
-                size: [1, 1],
-            },
-            destination: Rect {
-                position: [-0.275, 0.275],
-                size: [0.55, 0.55],
-            },
-            opacity: 1.0,
-        };
-        let initial_texture = load_image_texture(
-            &device,
-            &queue,
-            &texture_bind_group_layout,
-            initial_options.path,
-        );
-        let initial_options = ImageDrawOptions {
-            source: Rect {
-                size: initial_texture.size,
-                ..initial_options.source
-            },
-            ..initial_options
-        };
-        let initial_vertices = image_vertices(&initial_options, initial_texture.size);
-
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("2D rectangle shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
@@ -199,10 +170,11 @@ impl GameRenderer {
             multiview_mask: None,
             cache: None,
         });
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("animated sprite vertices"),
-            contents: bytemuck::cast_slice(&initial_vertices),
+        let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("image vertices"),
+            size: (std::mem::size_of::<Vertex>() * VERTEX_COUNT as usize) as wgpu::BufferAddress,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
 
         Self {
@@ -213,8 +185,7 @@ impl GameRenderer {
             pipeline,
             vertex_buffer,
             texture_bind_group_layout,
-            images: HashMap::from([(initial_options.path.to_owned(), initial_texture)]),
-            started_at: Instant::now(),
+            images: HashMap::new(),
         }
     }
 
@@ -242,23 +213,7 @@ impl GameRenderer {
             .expect("画像テクスチャのキャッシュ取得に失敗しました")
     }
 
-    pub fn render(&mut self) -> bool {
-        let elapsed = self.started_at.elapsed().as_secs_f32();
-        let options = ImageDrawOptions {
-            path: "../resources/circles.png",
-            source: Rect {
-                position: [0, 0],
-                size: [80, 80],
-            },
-            destination: Rect {
-                position: [
-                    0.70 * (elapsed * 0.55).sin() - 0.275,
-                    0.42 * (elapsed * 0.80).sin() + 0.275,
-                ],
-                size: [0.55, 0.55],
-            },
-            opacity: 0.20 + 0.80 * (0.5 + 0.5 * (elapsed * 1.20).sin()),
-        };
+    pub fn render(&mut self, options: &ImageDrawOptions<'_>) -> bool {
         let texture_size = self.image_texture(options.path).size;
         let vertices = image_vertices(&options, texture_size);
         self.queue
@@ -290,12 +245,7 @@ impl GameRenderer {
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.03,
-                            g: 0.05,
-                            b: 0.10,
-                            a: 1.0,
-                        }),
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                         store: wgpu::StoreOp::Store,
                     },
                 })],

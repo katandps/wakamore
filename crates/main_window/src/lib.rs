@@ -1,5 +1,7 @@
+mod game_content;
 mod game_renderer;
 
+use crate::game_content::GameContent;
 use crate::game_renderer::GameRenderer;
 use loop_manager::LoopManager;
 use play_core::AppState;
@@ -12,6 +14,7 @@ const GAME_WINDOW_TITLE: &str = "wakamore: game";
 pub struct MainWindow {
     pub window: &'static Window,
     renderer: GameRenderer,
+    content: GameContent,
     render_loop: LoopManager,
 }
 
@@ -27,6 +30,7 @@ impl MainWindow {
         MainWindow {
             window: game_window,
             renderer: game_lenderer,
+            content: GameContent::new(),
             render_loop: render_loop,
         }
     }
@@ -48,7 +52,8 @@ impl MainWindow {
     fn handle_redraw_requested(&mut self, app_state: &mut AppState) {
         let now = Instant::now();
         if self.render_loop.next_loop_is_came(now) {
-            if self.renderer.render() {
+            let options = self.content.draw_options();
+            if self.renderer.render(&options) {
                 app_state.performance.record_render();
             }
             self.render_loop.update_loop_state(now);
