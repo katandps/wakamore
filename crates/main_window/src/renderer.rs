@@ -9,7 +9,10 @@ use winit::window::Window;
 use crate::renderer::image::{IMAGE_VERTEX_COUNT, ImageDrawOptions, ImageTexture, ImageVertex};
 use crate::renderer::rectangle::{RECTANGLE_VERTEX_COUNT, RectangleDrawOptions, RectangleVertex};
 
-type Vertex = ImageVertex;
+pub enum DrawOptions {
+    Image(ImageDrawOptions<'static>),
+    Rectangle(RectangleDrawOptions),
+}
 
 #[derive(Clone, Copy)]
 pub struct Rect<T> {
@@ -58,13 +61,13 @@ impl Color {
     }
 }
 
-impl Vertex {
+impl ImageVertex {
     const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
         wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Float32];
 
     fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+            array_stride: std::mem::size_of::<ImageVertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &Self::ATTRIBUTES,
         }

@@ -1,5 +1,5 @@
 use crate::renderer::{
-    Color, Rect,
+    Color, DrawOptions, Rect,
     image::{ImageDestination, ImageDrawOptions, ImageSource},
     rectangle::RectangleDrawOptions,
 };
@@ -7,11 +7,6 @@ use std::time::Instant;
 
 pub struct GameContent {
     started_at: Instant,
-}
-
-pub enum DrawOptions {
-    Image(ImageDrawOptions<'static>),
-    Rectangle(RectangleDrawOptions),
 }
 
 impl GameContent {

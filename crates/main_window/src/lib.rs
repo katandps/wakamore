@@ -1,8 +1,8 @@
 mod game_content;
 mod renderer;
 
-use crate::game_content::{DrawOptions, GameContent};
-use crate::renderer::GameRenderer;
+use crate::game_content::GameContent;
+use crate::renderer::{DrawOptions, GameRenderer};
 use loop_manager::LoopManager;
 use play_core::AppState;
 use std::time::Instant;

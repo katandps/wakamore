@@ -68,7 +68,7 @@ pub fn image_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[Some(crate::renderer::Vertex::layout())],
+            buffers: &[Some(crate::renderer::ImageVertex::layout())],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: Some(wgpu::FragmentState {
