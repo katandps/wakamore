@@ -233,24 +233,19 @@ impl GameFrame<'_> {
     }
 
     pub fn end_frame(mut self) -> bool {
-        let image_vertices: Vec<ImageVertex> = self
-            .commands
-            .iter()
-            .filter_map(|command| match command {
-                DrawCommand::Image { vertices, .. } => Some(vertices),
-                DrawCommand::Rectangle(_) => None,
-            })
-            .flat_map(|vertices| vertices.iter().copied())
-            .collect();
-        let rectangle_vertices: Vec<RectangleVertex> = self
-            .commands
-            .iter()
-            .filter_map(|command| match command {
-                DrawCommand::Image { .. } => None,
-                DrawCommand::Rectangle(vertices) => Some(vertices),
-            })
-            .flat_map(|vertices| vertices.iter().copied())
-            .collect();
+        let mut image_vertices = Vec::new();
+        let mut rectangle_vertices = Vec::new();
+
+        for command in &self.commands {
+            match command {
+                DrawCommand::Image { vertices, .. } => {
+                    image_vertices.extend_from_slice(vertices);
+                }
+                DrawCommand::Rectangle(vertices) => {
+                    rectangle_vertices.extend_from_slice(vertices);
+                }
+            }
+        }
         let image_vertex_buffer = (!image_vertices.is_empty()).then(|| {
             self.renderer
                 .device
