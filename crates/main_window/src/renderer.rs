@@ -6,6 +6,7 @@ pub struct Rect<T> {
     position: [T; 2],
     size: [T; 2],
 }
+
 impl<T: Copy> Rect<T> {
     pub const fn new(x: T, y: T, width: T, height: T) -> Self {
         Self {
@@ -25,5 +26,24 @@ impl<T: Copy> Rect<T> {
     }
     pub fn height(&self) -> T {
         self.size[1]
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct Color {
+    red: f32,
+    green: f32,
+    blue: f32,
+    alpha: f32,
+}
+
+impl Color {
+    pub const fn new(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
+        Self {
+            red,
+            green,
+            blue,
+            alpha,
+        }
     }
 }

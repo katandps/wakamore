@@ -1,5 +1,5 @@
 use crate::renderer::{
-    Rect,
+    Color, Rect,
     image::{ImageDestination, ImageDrawOptions, ImageSource},
     rectangle::RectangleDrawOptions,
 };
@@ -38,7 +38,7 @@ impl GameContent {
             )),
             DrawOptions::Rectangle(RectangleDrawOptions::new(
                 Rect::new(0.0, 0.0, 0.5, 0.5),
-                [1.0, 0.0, 0.0, 1.0],
+                Color::new(1.0, 0.0, 0.0, 0.5),
             )),
         ]
     }
