@@ -2,7 +2,7 @@ mod game_content;
 mod game_renderer;
 mod renderer;
 
-use crate::game_content::GameContent;
+use crate::game_content::{DrawOptions, GameContent};
 use crate::game_renderer::GameRenderer;
 use loop_manager::LoopManager;
 use play_core::AppState;
@@ -55,7 +55,12 @@ impl MainWindow {
         if self.render_loop.next_loop_is_came(now) {
             let options = self.content.draw_options();
             let rendered = if let Some(mut frame) = self.renderer.begin_frame() {
-                frame.draw_image(&options);
+                for option in &options {
+                    match option {
+                        DrawOptions::Image(image_option) => frame.draw_image(image_option),
+                        DrawOptions::Rectangle(rect_option) => frame.draw_rectangle(rect_option),
+                    }
+                }
                 frame.end_frame()
             } else {
                 false

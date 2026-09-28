@@ -40,16 +40,16 @@ impl<'a> ImageDrawOptions<'a> {
     }
 
     pub fn dst_x(&self) -> f32 {
-        self.destination.rect.position[0]
+        self.destination.x()
     }
     pub fn dst_y(&self) -> f32 {
-        self.destination.rect.position[1]
+        self.destination.y()
     }
     pub fn dst_width(&self) -> f32 {
-        self.destination.rect.size[0]
+        self.destination.width()
     }
     pub fn dst_height(&self) -> f32 {
-        self.destination.rect.size[1]
+        self.destination.height()
     }
     pub fn opacity(&self) -> f32 {
         self.destination.opacity
@@ -102,39 +102,47 @@ impl<'a> ImageDrawOptions<'a> {
 }
 
 pub struct ImageSource<'a> {
-    pub path: &'a str,
-    pub source: Rect<u32>,
+    path: &'a str,
+    source: Rect<u32>,
 }
 impl<'a> ImageSource<'a> {
+    pub const fn new(path: &'a str, source: Rect<u32>) -> Self {
+        Self { path, source }
+    }
+
     pub fn x(&self) -> u32 {
-        self.source.position[0]
+        self.source.x()
     }
     pub fn y(&self) -> u32 {
-        self.source.position[1]
+        self.source.y()
     }
     pub fn width(&self) -> u32 {
-        self.source.size[0]
+        self.source.width()
     }
     pub fn height(&self) -> u32 {
-        self.source.size[1]
+        self.source.height()
     }
 }
 
 pub struct ImageDestination {
-    pub rect: Rect<f32>,
-    pub opacity: f32,
+    rect: Rect<f32>,
+    opacity: f32,
 }
 impl ImageDestination {
+    pub const fn new(rect: Rect<f32>, opacity: f32) -> Self {
+        Self { rect, opacity }
+    }
+
     pub fn x(&self) -> f32 {
-        self.rect.position[0]
+        self.rect.x()
     }
     pub fn y(&self) -> f32 {
-        self.rect.position[1]
+        self.rect.y()
     }
     pub fn width(&self) -> f32 {
-        self.rect.size[0]
+        self.rect.width()
     }
     pub fn height(&self) -> f32 {
-        self.rect.size[1]
+        self.rect.height()
     }
 }

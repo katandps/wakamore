@@ -3,6 +3,7 @@ use wgpu::util::DeviceExt;
 use winit::window::Window;
 
 use crate::renderer::image::{IMAGE_VERTEX_COUNT, ImageDrawOptions, ImageVertex};
+use crate::renderer::rectangle::{RECTANGLE_VERTEX_COUNT, RectangleDrawOptions, RectangleVertex};
 
 type Vertex = ImageVertex;
 
@@ -19,6 +20,19 @@ impl Vertex {
     }
 }
 
+impl RectangleVertex {
+    const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
+        wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x4];
+
+    fn layout() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &Self::ATTRIBUTES,
+        }
+    }
+}
+
 struct ImageTexture {
     bind_group: wgpu::BindGroup,
     size: [u32; 2],
@@ -29,9 +43,18 @@ pub struct GameRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
-    pipeline: wgpu::RenderPipeline,
+    image_pipeline: wgpu::RenderPipeline,
+    rectangle_pipeline: wgpu::RenderPipeline,
     texture_bind_group_layout: wgpu::BindGroupLayout,
     images: HashMap<String, ImageTexture>,
+}
+
+enum DrawCommand {
+    Image {
+        path: String,
+        vertices: [ImageVertex; IMAGE_VERTEX_COUNT],
+    },
+    Rectangle([RectangleVertex; RECTANGLE_VERTEX_COUNT]),
 }
 
 pub struct GameFrame<'a> {
@@ -39,7 +62,7 @@ pub struct GameFrame<'a> {
     frame: wgpu::SurfaceTexture,
     view: wgpu::TextureView,
     encoder: wgpu::CommandEncoder,
-    images: Vec<(String, [Vertex; IMAGE_VERTEX_COUNT])>,
+    commands: Vec<DrawCommand>,
 }
 
 impl GameRenderer {
@@ -80,14 +103,15 @@ impl GameRenderer {
             label: Some("2D rectangle shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("2D pipeline layout"),
-            bind_group_layouts: &[Some(&texture_bind_group_layout)],
-            immediate_size: 0,
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let image_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("2D pipeline layout"),
+                bind_group_layouts: &[Some(&texture_bind_group_layout)],
+                immediate_size: 0,
+            });
+        let image_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("2D texture pipeline"),
-            layout: Some(&pipeline_layout),
+            layout: Some(&image_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
@@ -110,12 +134,44 @@ impl GameRenderer {
             multiview_mask: None,
             cache: None,
         });
+        let rectangle_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("rectangle pipeline layout"),
+                bind_group_layouts: &[],
+                immediate_size: 0,
+            });
+        let rectangle_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("rectangle pipeline"),
+            layout: Some(&rectangle_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_rectangle"),
+                buffers: &[Some(RectangleVertex::layout())],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_rectangle"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
         Self {
             surface,
             device,
             queue,
             config,
-            pipeline,
+            image_pipeline,
+            rectangle_pipeline,
             texture_bind_group_layout,
             images: HashMap::new(),
         }
@@ -171,7 +227,7 @@ impl GameRenderer {
             frame,
             view,
             encoder,
-            images: Vec::new(),
+            commands: Vec::new(),
         })
     }
 }
@@ -180,7 +236,15 @@ impl GameFrame<'_> {
     pub fn draw_image(&mut self, options: &ImageDrawOptions<'_>) {
         let texture_size = self.renderer.image_texture(options.src_path()).size;
         let vertices = options.vertices(texture_size);
-        self.images.push((options.src_path().to_owned(), vertices));
+        self.commands.push(DrawCommand::Image {
+            path: options.src_path().to_owned(),
+            vertices,
+        });
+    }
+
+    pub fn draw_rectangle(&mut self, options: &RectangleDrawOptions) {
+        self.commands
+            .push(DrawCommand::Rectangle(options.vertices()));
     }
 
     pub fn end_frame(self) -> bool {
@@ -189,19 +253,44 @@ impl GameFrame<'_> {
             frame,
             view,
             mut encoder,
-            images,
+            commands,
         } = self;
-        let vertices: Vec<Vertex> = images
+        let image_vertices: Vec<ImageVertex> = commands
             .iter()
-            .flat_map(|(_, vertices)| vertices.iter().copied())
+            .filter_map(|command| match command {
+                DrawCommand::Image { vertices, .. } => Some(vertices),
+                DrawCommand::Rectangle(_) => None,
+            })
+            .flat_map(|vertices| vertices.iter().copied())
             .collect();
-        let vertex_buffer = renderer
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("image vertices"),
-                contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+        let rectangle_vertices: Vec<RectangleVertex> = commands
+            .iter()
+            .filter_map(|command| match command {
+                DrawCommand::Image { .. } => None,
+                DrawCommand::Rectangle(vertices) => Some(vertices),
+            })
+            .flat_map(|vertices| vertices.iter().copied())
+            .collect();
+        let image_vertex_buffer = (!image_vertices.is_empty()).then(|| {
+            renderer
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("image vertices"),
+                    contents: bytemuck::cast_slice(&image_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                })
+        });
+        let rectangle_vertex_buffer = (!rectangle_vertices.is_empty()).then(|| {
+            renderer
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("rectangle vertices"),
+                    contents: bytemuck::cast_slice(&rectangle_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                })
+        });
+        let mut image_index = 0;
+        let mut rectangle_index = 0;
 
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -220,21 +309,49 @@ impl GameFrame<'_> {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            pass.set_pipeline(&renderer.pipeline);
-            for (index, (path, _)) in images.iter().enumerate() {
-                pass.set_bind_group(
-                    0,
-                    &renderer
-                        .images
-                        .get(path)
-                        .expect("画像テクスチャのキャッシュ取得に失敗しました")
-                        .bind_group,
-                    &[],
-                );
-                let offset = (index * IMAGE_VERTEX_COUNT * std::mem::size_of::<Vertex>())
-                    as wgpu::BufferAddress;
-                pass.set_vertex_buffer(0, vertex_buffer.slice(offset..));
-                pass.draw(0..IMAGE_VERTEX_COUNT as u32, 0..1);
+            for command in &commands {
+                match command {
+                    DrawCommand::Image { path, .. } => {
+                        pass.set_pipeline(&renderer.image_pipeline);
+                        pass.set_bind_group(
+                            0,
+                            &renderer
+                                .images
+                                .get(path)
+                                .expect("画像テクスチャのキャッシュ取得に失敗しました")
+                                .bind_group,
+                            &[],
+                        );
+                        let offset =
+                            (image_index * IMAGE_VERTEX_COUNT * std::mem::size_of::<ImageVertex>())
+                                as wgpu::BufferAddress;
+                        pass.set_vertex_buffer(
+                            0,
+                            image_vertex_buffer
+                                .as_ref()
+                                .expect("画像頂点バッファがありません")
+                                .slice(offset..),
+                        );
+                        pass.draw(0..IMAGE_VERTEX_COUNT as u32, 0..1);
+                        image_index += 1;
+                    }
+                    DrawCommand::Rectangle(_) => {
+                        pass.set_pipeline(&renderer.rectangle_pipeline);
+                        let offset = (rectangle_index
+                            * RECTANGLE_VERTEX_COUNT
+                            * std::mem::size_of::<RectangleVertex>())
+                            as wgpu::BufferAddress;
+                        pass.set_vertex_buffer(
+                            0,
+                            rectangle_vertex_buffer
+                                .as_ref()
+                                .expect("矩形頂点バッファがありません")
+                                .slice(offset..),
+                        );
+                        pass.draw(0..RECTANGLE_VERTEX_COUNT as u32, 0..1);
+                        rectangle_index += 1;
+                    }
+                }
             }
         }
         renderer.queue.submit(Some(encoder.finish()));
