@@ -98,6 +98,21 @@ impl DebugRenderer {
         current_screen: &str,
         main_window_size: winit::dpi::PhysicalSize<u32>,
     ) -> bool {
+        // Check surface validity first, before running UI
+        let frame = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(frame)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
+            wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
+                self.surface.configure(&self.device, &self.config);
+                return false;
+            }
+            wgpu::CurrentSurfaceTexture::Timeout
+            | wgpu::CurrentSurfaceTexture::Occluded
+            | wgpu::CurrentSurfaceTexture::Validation => {
+                return false;
+            }
+        };
+
         let loops_per_second = performance.loops_per_second;
         let frames_per_second = performance.frames_per_second;
 
@@ -134,22 +149,6 @@ impl DebugRenderer {
         let paint_jobs = self
             .egui_context
             .tessellate(full_output.shapes, full_output.pixels_per_point);
-
-        let frame = match self.surface.get_current_texture() {
-            wgpu::CurrentSurfaceTexture::Success(frame)
-            | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
-            wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
-                self.surface.configure(&self.device, &self.config);
-                full_output.textures_delta.clear();
-                return false;
-            }
-            wgpu::CurrentSurfaceTexture::Timeout
-            | wgpu::CurrentSurfaceTexture::Occluded
-            | wgpu::CurrentSurfaceTexture::Validation => {
-                full_output.textures_delta.clear();
-                return false;
-            }
-        };
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
