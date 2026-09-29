@@ -1,3 +1,6 @@
+mod judge_line;
+mod note;
+
 use crate::renderer::{
     Color, DrawOptions, Rect,
     image::{ImageDestination, ImageDrawOptions, ImageSource},
@@ -7,17 +10,23 @@ use std::time::Instant;
 
 pub struct GameContent {
     started_at: Instant,
+    judge_line: judge_line::JudgeLine,
+    notes: Vec<note::Note>,
 }
 
 impl GameContent {
     pub fn new() -> Self {
         Self {
             started_at: Instant::now(),
+            judge_line: judge_line::JudgeLine,
+            notes: Vec::new(),
         }
     }
 
     pub fn draw_options(&self) -> Vec<DrawOptions> {
         let elapsed = self.started_at.elapsed().as_secs_f32();
+        let judge_line = self.judge_line.draw_options();
+        let notes = self.notes.iter().flat_map(|note| note.draw_options());
         vec![
             DrawOptions::Image(ImageDrawOptions::new(
                 DUMMY_IMAGE,
@@ -36,6 +45,10 @@ impl GameContent {
                 Color::new(1.0, 0.0, 0.0, 0.5),
             )),
         ]
+        .into_iter()
+        .chain(judge_line)
+        .chain(notes)
+        .collect()
     }
 }
 
