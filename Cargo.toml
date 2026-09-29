@@ -11,3 +11,4 @@ members = [
 [workspace.dependencies]
 log = "0.4.34"
 winit = "0.30.13"
+wgpu = { version = "30.0.1", default-features = false, features = ["gles", "metal", "wgsl"] }

@@ -6,8 +6,8 @@ edition = "2024"
 [dependencies]
 bytemuck = { version = "1.23", features = ["derive"] }
 image = { version = "0.25.10", default-features = false, features = ["png"] }
-wgpu = { version = "30.0.1", default-features = false, features = ["gles", "wgsl"] }
 
+wgpu.workspace = true
 winit.workspace = true
 
 loop_manager = { path = "../loop_manager" }

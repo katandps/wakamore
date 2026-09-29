@@ -7,9 +7,9 @@ edition = "2024"
 egui = "0.36.2"
 egui-wgpu = { version = "0.36.2", default-features = false }
 egui-winit = "0.36.2"
-wgpu = { version = "30.0.1", default-features = false, features = ["gles", "wgsl"] }
-winit = "0.30.13"
 
+wgpu.workspace = true
+winit.workspace = true
 log.workspace = true
 
 play_core = { path = "../play_core" }
