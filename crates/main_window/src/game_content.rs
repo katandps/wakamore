@@ -19,7 +19,9 @@ impl GameContent {
         Self {
             started_at: Instant::now(),
             judge_line: judge_line::JudgeLine,
-            notes: Vec::new(),
+            notes: vec![note::Note {
+                timing: Instant::now(),
+            }],
         }
     }
 
@@ -53,3 +55,7 @@ impl GameContent {
 }
 
 const DUMMY_IMAGE: ImageSource = ImageSource::new("resources/circles.png", Rect::new(0, 0, 80, 80));
+
+trait PlayComponent {
+    fn draw_options(&self) -> Vec<DrawOptions>;
+}
