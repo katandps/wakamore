@@ -5,7 +5,7 @@ pub struct JudgeLine;
 impl PlayComponent for JudgeLine {
     fn draw_options(&self) -> Vec<DrawOptions> {
         vec![DrawOptions::Rectangle(RectangleDrawOptions::new(
-            Rect::new(0.0, 0.0, 1.0, 0.1),
+            Rect::new(400, 300, 400, 30),
             Color::new(1.0, 1.0, 1.0, 1.0),
         ))]
     }

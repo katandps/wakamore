@@ -1,4 +1,4 @@
-use crate::renderer::{Color, Rect};
+use crate::renderer::{Color, DestinationRect};
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -10,20 +10,22 @@ pub struct RectangleVertex {
 pub const RECTANGLE_VERTEX_COUNT: usize = 6;
 
 pub struct RectangleDrawOptions {
-    pub destination: Rect<f32>,
+    pub destination: DestinationRect,
     pub color: Color,
 }
 
 impl RectangleDrawOptions {
-    pub fn new(destination: Rect<f32>, color: Color) -> Self {
-        Self { destination, color }
+    pub fn new(destination: impl Into<DestinationRect>, color: Color) -> Self {
+        Self {
+            destination: destination.into(),
+            color,
+        }
     }
 
-    pub fn vertices(&self) -> [RectangleVertex; RECTANGLE_VERTEX_COUNT] {
-        let left = self.destination.position[0];
-        let top = self.destination.position[1];
-        let right = left + self.destination.size[0];
-        let bottom = top - self.destination.size[1];
+    pub fn vertices(&self, viewport_size: [u32; 2]) -> [RectangleVertex; RECTANGLE_VERTEX_COUNT] {
+        let [left, top, width, height] = self.destination.to_ndc(viewport_size);
+        let right = left + width;
+        let bottom = top - height;
         let color = [
             self.color.red,
             self.color.green,

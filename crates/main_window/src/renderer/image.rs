@@ -1,4 +1,4 @@
-use crate::renderer::Rect;
+use crate::renderer::{DestinationRect, Rect};
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -39,31 +39,37 @@ impl<'a> ImageDrawOptions<'a> {
         self.source.height()
     }
 
-    pub fn dst_x(&self) -> f32 {
-        self.destination.x()
+    pub fn dst_x(&self, viewport_size: [u32; 2]) -> f32 {
+        self.destination.rect.to_ndc(viewport_size)[0]
     }
-    pub fn dst_y(&self) -> f32 {
-        self.destination.y()
+    pub fn dst_y(&self, viewport_size: [u32; 2]) -> f32 {
+        self.destination.rect.to_ndc(viewport_size)[1]
     }
-    pub fn dst_width(&self) -> f32 {
-        self.destination.width()
+    pub fn dst_width(&self, viewport_size: [u32; 2]) -> f32 {
+        self.destination.rect.to_ndc(viewport_size)[2]
     }
-    pub fn dst_height(&self) -> f32 {
-        self.destination.height()
+    pub fn dst_height(&self, viewport_size: [u32; 2]) -> f32 {
+        self.destination.rect.to_ndc(viewport_size)[3]
     }
     pub fn opacity(&self) -> f32 {
         self.destination.opacity
     }
 
-    pub fn vertices(&self, texture_size: [u32; 2]) -> [ImageVertex; IMAGE_VERTEX_COUNT] {
+    pub fn vertices(
+        &self,
+        texture_size: [u32; 2],
+        viewport_size: [u32; 2],
+    ) -> [ImageVertex; IMAGE_VERTEX_COUNT] {
         let source_left = self.src_x() as f32 / texture_size[0] as f32;
         let source_top = self.src_y() as f32 / texture_size[1] as f32;
         let source_right = (self.src_x() + self.src_width()) as f32 / texture_size[0] as f32;
         let source_bottom = (self.src_y() + self.src_height()) as f32 / texture_size[1] as f32;
-        let left = self.dst_x();
-        let top = self.dst_y();
-        let right = left + self.dst_width();
-        let bottom = top - self.dst_height();
+        let left = self.dst_x(viewport_size);
+        let top = self.dst_y(viewport_size);
+        let width = self.dst_width(viewport_size);
+        let height = self.dst_height(viewport_size);
+        let right = left + width;
+        let bottom = top - height;
         let opacity = self.opacity().clamp(0.0, 1.0);
 
         [
@@ -125,25 +131,15 @@ impl<'a> ImageSource<'a> {
 }
 
 pub struct ImageDestination {
-    rect: Rect<f32>,
+    rect: DestinationRect,
     opacity: f32,
 }
 impl ImageDestination {
-    pub const fn new(rect: Rect<f32>, opacity: f32) -> Self {
-        Self { rect, opacity }
-    }
-
-    pub fn x(&self) -> f32 {
-        self.rect.x()
-    }
-    pub fn y(&self) -> f32 {
-        self.rect.y()
-    }
-    pub fn width(&self) -> f32 {
-        self.rect.width()
-    }
-    pub fn height(&self) -> f32 {
-        self.rect.height()
+    pub fn new(rect: impl Into<DestinationRect>, opacity: f32) -> Self {
+        Self {
+            rect: rect.into(),
+            opacity,
+        }
     }
 }
 

@@ -43,6 +43,64 @@ impl<T: Copy> Rect<T> {
 }
 
 #[derive(Clone, Copy)]
+pub enum DestinationRect {
+    Relative(Rect<f32>),
+    Pixels(Rect<i32>),
+    UnsignedPixels(Rect<u32>),
+}
+
+impl From<Rect<f32>> for DestinationRect {
+    fn from(rect: Rect<f32>) -> Self {
+        Self::Relative(rect)
+    }
+}
+
+impl From<Rect<i32>> for DestinationRect {
+    fn from(rect: Rect<i32>) -> Self {
+        Self::Pixels(rect)
+    }
+}
+
+impl From<Rect<u32>> for DestinationRect {
+    fn from(rect: Rect<u32>) -> Self {
+        Self::UnsignedPixels(rect)
+    }
+}
+
+impl DestinationRect {
+    pub(crate) fn to_ndc(self, viewport_size: [u32; 2]) -> [f32; 4] {
+        match self {
+            Self::Relative(rect) => [rect.x(), rect.y(), rect.width(), rect.height()],
+            Self::Pixels(rect) => Self::pixels_to_ndc(
+                rect.x() as f64,
+                rect.y() as f64,
+                rect.width() as f64,
+                rect.height() as f64,
+                viewport_size,
+            ),
+            Self::UnsignedPixels(rect) => Self::pixels_to_ndc(
+                rect.x() as f64,
+                rect.y() as f64,
+                rect.width() as f64,
+                rect.height() as f64,
+                viewport_size,
+            ),
+        }
+    }
+
+    fn pixels_to_ndc(x: f64, y: f64, width: f64, height: f64, viewport_size: [u32; 2]) -> [f32; 4] {
+        let viewport_width = viewport_size[0] as f64;
+        let viewport_height = viewport_size[1] as f64;
+        [
+            (x / viewport_width * 2.0 - 1.0) as f32,
+            (1.0 - y / viewport_height * 2.0) as f32,
+            (width / viewport_width * 2.0) as f32,
+            (height / viewport_height * 2.0) as f32,
+        ]
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct Color {
     red: f32,
     green: f32,
@@ -223,7 +281,8 @@ impl GameRenderer {
 impl GameFrame<'_> {
     pub fn draw_image(&mut self, options: &ImageDrawOptions<'_>) {
         let texture_size = self.renderer.image_texture(options.src_path()).size;
-        let vertices = options.vertices(texture_size);
+        let viewport_size = [self.renderer.config.width, self.renderer.config.height];
+        let vertices = options.vertices(texture_size, viewport_size);
         self.commands.push(DrawCommand::Image {
             path: options.src_path().to_owned(),
             vertices,
@@ -231,8 +290,9 @@ impl GameFrame<'_> {
     }
 
     pub fn draw_rectangle(&mut self, options: &RectangleDrawOptions) {
+        let viewport_size = [self.renderer.config.width, self.renderer.config.height];
         self.commands
-            .push(DrawCommand::Rectangle(options.vertices()));
+            .push(DrawCommand::Rectangle(options.vertices(viewport_size)));
     }
 
     pub fn end_frame(mut self) -> bool {
